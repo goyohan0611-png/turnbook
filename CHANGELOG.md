@@ -5,6 +5,16 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 
 ## Unreleased
 
+- **Follow-up continuity checks.** Empty edits cannot erase a task's objective or its required
+  handover action. Open tasks stay ahead of completed history in the indexed work queue (the
+  first prototype's rows are upgraded in place). Dependency freshness is checked through the
+  whole chain, so a completed review of an older implementation cannot unblock later work.
+  Added independent-process contention, killed-transaction recovery, upgrade and stdio-MCP
+  integration tests.
+- **Close shared-memory read connections cleanly.** Cached Postgres readers are closed at process
+  exit and when replaced after a dropped connection. A connection that fails during initial
+  table setup is closed too. Test fixtures also close their ledgers and reap their dummy capture
+  processes, so shutdown warnings identify actual leaks rather than test leftovers.
 - **Continue across agents, and split implementation from verification (local prototype).**
   `brain_work` keeps a task's goal, owner, progress, next action, file/commit references and checks
   in this PC's memory store. Assign separate tasks to apps or sessions, optionally depending on

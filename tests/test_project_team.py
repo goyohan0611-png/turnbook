@@ -260,6 +260,13 @@ class TeamHubTests(unittest.TestCase):
         from mcp import Client
         from turnbook.mcp_server import build_server
 
+        def current_instructions():
+            ledger = pl.ledger_for("graph-mind")
+            try:
+                return ledger.instructions("graph-mind")
+            finally:
+                ledger.db.close()
+
         async def run():
             async with Client(build_server(self.root / "a.sqlite")) as a:
                 call = lambda **k: a.call_tool("brain_checkpoint", k)  # noqa: E731
@@ -286,21 +293,20 @@ class TeamHubTests(unittest.TestCase):
                 proposed = (await call(action="set_instructions", project="graph-mind",
                                        instructions="커밋 전에 테스트")).structured_content
                 self.assertEqual(proposed["command"], 'turnbook team instructions "graph-mind"')
-                self.assertEqual(pl.ledger_for("graph-mind").instructions("graph-mind"), "")
+                self.assertEqual(current_instructions(), "")
                 from turnbook import mcp_server
                 with mock.patch.object(mcp_server, "configured_db_path",
                                        return_value=self.root / "a.sqlite"), \
                         mock.patch("builtins.input", return_value="n"):
                     self.assertEqual(await asyncio.to_thread(
                         mcp_server.terminal_command, ["team", "instructions", "graph-mind"]), 1)
-                self.assertEqual(pl.ledger_for("graph-mind").instructions("graph-mind"), "")
+                self.assertEqual(current_instructions(), "")
                 with mock.patch.object(mcp_server, "configured_db_path",
                                        return_value=self.root / "a.sqlite"), \
                         mock.patch("builtins.input", return_value="y"):
                     await asyncio.to_thread(
                         mcp_server.terminal_command, ["team", "instructions", "graph-mind"])
-                self.assertEqual(pl.ledger_for("graph-mind").instructions("graph-mind"),
-                                 "커밋 전에 테스트")
+                self.assertEqual(current_instructions(), "커밋 전에 테스트")
                 refused = (await call(action="remove_member", member="minji")).structured_content
                 self.assertEqual(refused["status"], "REFUSED")    # never the whole account
                 self.assertTrue(pl.accounts())

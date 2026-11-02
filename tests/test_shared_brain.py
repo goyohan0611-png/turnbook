@@ -47,6 +47,7 @@ def scratch_postgres(root: Path, port: int):
     try:
         yield f"postgresql://postgres@127.0.0.1:{port}/postgres"
     finally:
+        sharing.close_readers()
         sharing.stop_postgres(data)
 
 
@@ -288,7 +289,7 @@ class HubCursorTests(unittest.TestCase):
             sharing.sync(url, index)
             with psycopg.connect(url, autocommit=True) as admin:              # now hub B
                 admin.execute("DROP TABLE sharing, sharing_hub")
-            sharing._READERS.clear()
+            sharing.close_readers()
             sharing.append_many(url, [("turn", turn(i)) for i in (4, 5)])
             sharing.sync(url, index)
             with ConversationMemoryStore(index) as store:

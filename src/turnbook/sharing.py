@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import atexit
 import base64
 import functools
 import hashlib
@@ -1131,19 +1132,37 @@ PG_LIMITS = {"connect_timeout": 5, "keepalives": 1, "keepalives_idle": 30,
 def _pg(url):
     import psycopg
     connection = psycopg.connect(url, autocommit=False, **PG_LIMITS)
-    connection.execute("""CREATE TABLE IF NOT EXISTS sharing(
-        seq BIGSERIAL PRIMARY KEY, device TEXT NOT NULL, line TEXT NOT NULL)""")
-    # which hub this is, for the read cursor (one row; the first PC to look draws it)
-    connection.execute("""CREATE TABLE IF NOT EXISTS sharing_hub(
-        one BOOLEAN PRIMARY KEY DEFAULT true CHECK (one), id TEXT NOT NULL)""")
-    import uuid
-    connection.execute("INSERT INTO sharing_hub(id) VALUES (%s) ON CONFLICT DO NOTHING",
-                       (uuid.uuid4().hex,))
-    connection.commit()
+    try:
+        connection.execute("""CREATE TABLE IF NOT EXISTS sharing(
+            seq BIGSERIAL PRIMARY KEY, device TEXT NOT NULL, line TEXT NOT NULL)""")
+        # which hub this is, for the read cursor (one row; the first PC to look draws it)
+        connection.execute("""CREATE TABLE IF NOT EXISTS sharing_hub(
+            one BOOLEAN PRIMARY KEY DEFAULT true CHECK (one), id TEXT NOT NULL)""")
+        import uuid
+        connection.execute("INSERT INTO sharing_hub(id) VALUES (%s) ON CONFLICT DO NOTHING",
+                           (uuid.uuid4().hex,))
+        connection.commit()
+    except BaseException:
+        connection.close()
+        raise
     return connection
 
 
 _READERS: dict = {}
+
+
+def close_readers():
+    """Release cached read connections at shutdown (or before stopping a disposable test hub)."""
+    connections = list(_READERS.values())
+    _READERS.clear()
+    for connection in connections:
+        try:
+            connection.close()
+        except Exception:
+            pass                        # shutdown must still close the other connections
+
+
+atexit.register(close_readers)
 
 
 def _read_rows(url, query, parameters):
@@ -1159,7 +1178,9 @@ def _read_rows(url, query, parameters):
         try:
             return connection.execute(query, parameters).fetchall()
         except psycopg.OperationalError:
-            _READERS.pop(url, None)
+            if _READERS.get(url) is connection:
+                _READERS.pop(url, None)
+            connection.close()
             if attempt == 2:
                 raise
 

@@ -89,6 +89,7 @@ class CaptureServiceDiedTests(unittest.TestCase):
             finally:
                 for process in started:
                     process.kill()
+                    process.wait(timeout=10)
 
 
 class ModelBrokenTests(unittest.TestCase):

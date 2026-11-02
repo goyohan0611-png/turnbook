@@ -36,7 +36,9 @@ still belong to the chosen provider. No new LLM call is needed to store or read 
 `(absolute workspace, task id)`. Windows paths ignore case and slash style; POSIX paths keep case.
 No implicit global project, relative paths or cross-project fallback are accepted.
 
-1. `list` / `status`: see tasks or one task's packet and revision. The list is bounded to 30.
+1. `list` / `status`: see tasks or one task's packet and revision. The indexed list is bounded to
+   30; unfinished work is ordered first, then most recently updated. Completed history cannot
+   push active tasks out of the list. First-prototype records are upgraded without losing packets.
 2. `assign`: create a READY task for an app (`codex`) or one session (`claude-code:session-id`).
    `depends_on` names existing tasks in this workspace. Assign implementation first, then its
    dependent test/review task. Independent tasks can run concurrently under different ids.
@@ -49,6 +51,8 @@ No implicit global project, relative paths or cross-project fallback are accepte
    any connected agent may claim it. An old timestamp alone never permits taking active work.
 6. `complete`: the active owner marks it complete. A dependent task cannot complete against a
    dependency revision different from the one it claimed; pause, reclaim and recheck instead.
+   This also checks transitive inputs: a completed review becomes stale if its implementation
+   changes, and cannot unblock a later delivery task until the review is refreshed.
 7. `clear`: erase an inactive task packet while keeping the revision counter, so delayed writes
    cannot resurrect it. This does not erase copies already in conversations or an app's history.
 
@@ -98,6 +102,9 @@ Checkpoint before a long action and after a meaningful result. An abrupt model/a
 leave an older checkpoint. The previous conversation and `Did:` records help recover what
 actually happened; absent evidence must remain unknown. An adapter may release an owner only
 after establishing that it stopped, never merely because a timer expired.
+
+An explicitly empty objective is invalid; an explicitly empty next action cannot be used to
+pause, even if an older action exists. Omitting these fields preserves the existing values.
 
 ## Next integration gates
 

@@ -48,10 +48,45 @@ class WorkState:
         database = Path(database)
         database.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(database, timeout=5, isolation_level=None)
-        self.db.execute("PRAGMA secure_delete=ON")
-        self.db.execute("""CREATE TABLE IF NOT EXISTS work_items (
-            workspace TEXT NOT NULL, task_id TEXT NOT NULL, revision INTEGER NOT NULL,
-            packet TEXT NOT NULL, PRIMARY KEY (workspace, task_id))""")
+        try:
+            self.db.execute("PRAGMA secure_delete=ON")
+            self.db.execute("""CREATE TABLE IF NOT EXISTS work_items (
+                workspace TEXT NOT NULL, task_id TEXT NOT NULL, revision INTEGER NOT NULL,
+                packet TEXT NOT NULL, is_open INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT '', PRIMARY KEY (workspace, task_id))""")
+            self._upgrade_ordering()
+            self.db.execute("CREATE INDEX IF NOT EXISTS work_items_queue ON work_items "
+                            "(workspace,is_open DESC,updated_at DESC,task_id)")
+        except BaseException:
+            self.db.close()
+            raise
+
+    def _upgrade_ordering(self):
+        """Upgrade the first prototype without losing packets, serialized with other writers."""
+        def names():
+            return {row[1] for row in self.db.execute("PRAGMA table_info(work_items)")}
+        if {"is_open", "updated_at"} <= names():
+            return
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            columns, changed = names(), False
+            for name, definition in (("is_open", "INTEGER NOT NULL DEFAULT 0"),
+                                     ("updated_at", "TEXT NOT NULL DEFAULT ''")):
+                if name not in columns:
+                    self.db.execute(f"ALTER TABLE work_items ADD COLUMN {name} {definition}")
+                    changed = True
+            if changed:
+                for workspace, task, raw in self.db.execute(
+                        "SELECT workspace,task_id,packet FROM work_items"):
+                    packet = json.loads(raw)
+                    self.db.execute("UPDATE work_items SET is_open=?,updated_at=? "
+                                    "WHERE workspace=? AND task_id=?",
+                                    (int(packet["state"] in {"ACTIVE", "READY", "PAUSED"}),
+                                     packet["updated_at"], workspace, task))
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
 
     def __enter__(self):
         return self
@@ -66,7 +101,7 @@ class WorkState:
 
     def tasks(self, workspace, limit=30):
         rows = self.db.execute("SELECT packet FROM work_items WHERE workspace=? "
-                               "ORDER BY rowid DESC LIMIT ?",
+                               "ORDER BY is_open DESC,updated_at DESC,task_id LIMIT ?",
                                (workspace_key(workspace), max(1, min(limit, 100))))
         return [json.loads(row[0]) for row in rows]
 
@@ -85,6 +120,8 @@ class WorkState:
         patch = {name: _text(value, size) for name, value, size in (
             ("objective", objective, 1000), ("summary", summary, 4000),
             ("next_action", next_action, 2000)) if value is not None}
+        if "objective" in patch and not patch["objective"]:
+            raise ValueError("An objective cannot be empty")
         for name, value in (("references", references), ("checks", checks)):
             if value is not None:
                 patch[name] = _list(value)
@@ -127,8 +164,8 @@ class WorkState:
                     reason = "OWNER_STILL_ACTIVE"
             elif before["state"] != "ACTIVE" or before["owner"] != agent:
                 reason = "NOT_ACTIVE_OWNER"
-            if not reason and action == "pause" and not (
-                    patch.get("next_action") or (before or {}).get("next_action")):
+            if not reason and action == "pause" and not patch.get(
+                    "next_action", (before or {}).get("next_action")):
                 reason = "NEXT_ACTION_REQUIRED"
             continuing = before and before["state"] in {"ACTIVE", "PAUSED", "READY"}
             if not reason and continuing and depends_on is not None:
@@ -168,6 +205,9 @@ class WorkState:
                     if action in {"claim", "complete"} and dep["state"] != "COMPLETE":
                         reason = "DEPENDENCIES_NOT_COMPLETE"
                         break
+                    if action in {"claim", "complete"} and not self._current_dependency(key, dep):
+                        reason = "DEPENDENCY_CHANGED"
+                        break
                 if action == "complete" and not reason and dependency_revisions != \
                         before.get("dependency_revisions", {}):
                     reason = "DEPENDENCY_CHANGED"
@@ -193,11 +233,16 @@ class WorkState:
                                  "pause": "PAUSED", "complete": "COMPLETE",
                                  "clear": "EMPTY"}[action],
                           owner="" if action in {"clear", "assign"} else agent,
-                          updated_at=datetime.now(timezone.utc).isoformat())
-            self.db.execute("INSERT INTO work_items VALUES (?,?,?,?) "
+                          updated_at=datetime.now(timezone.utc).isoformat(timespec="microseconds"))
+            self.db.execute("INSERT INTO work_items "
+                            "(workspace,task_id,revision,packet,is_open,updated_at) "
+                            "VALUES (?,?,?,?,?,?) "
                             "ON CONFLICT(workspace,task_id) "
-                            "DO UPDATE SET revision=excluded.revision,packet=excluded.packet",
-                            (key, task, packet["revision"], json.dumps(packet, ensure_ascii=False)))
+                            "DO UPDATE SET revision=excluded.revision,packet=excluded.packet,"
+                            "is_open=excluded.is_open,updated_at=excluded.updated_at",
+                            (key, task, packet["revision"], json.dumps(packet, ensure_ascii=False),
+                             int(packet["state"] in {"ACTIVE", "READY", "PAUSED"}),
+                             packet["updated_at"]))
             self.db.commit()
             result = {"status": "OK", "revision": packet["revision"], "work": packet}
             if action == "claim":
@@ -206,6 +251,28 @@ class WorkState:
         except BaseException:
             self.db.rollback()
             raise
+
+    def _current_dependency(self, workspace, packet):
+        """A finished review is stale if anything it relied on has since changed, at any depth.
+
+        Called within change's write transaction, so every link is one consistent snapshot.
+        """
+        pending, seen = [packet], set()
+        while pending:
+            item = pending.pop()
+            if item["task"] in seen:
+                continue
+            seen.add(item["task"])
+            for dependency in item.get("depends_on", []):
+                row = self.db.execute("SELECT packet FROM work_items "
+                                      "WHERE workspace=? AND task_id=?",
+                                      (workspace, dependency)).fetchone()
+                dep = json.loads(row[0]) if row else None
+                if not dep or dep["state"] != "COMPLETE" or dep["revision"] != \
+                        item.get("dependency_revisions", {}).get(dependency):
+                    return False
+                pending.append(dep)
+        return True
 
 
 def context(packet, maximum=1100):
