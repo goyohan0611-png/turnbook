@@ -274,6 +274,14 @@ class WorkState:
                 packet.update(patch)
             if action in {"assign", "pause"}:
                 packet["assigned_to"] = target or "any"
+            if action == "complete":
+                # done: an earlier "next" is no longer next. Checks not restated are an earlier
+                # worker's ("tests not run yet" outlived the run that passed; real-app smoke 11-02)
+                packet["next_action"] = patch.get("next_action", "")
+                if "checks" not in patch and packet.get("checks"):
+                    packet["checks"] = ["(recorded before completion) " + check
+                                        for check in packet["checks"]
+                                        if not check.startswith("(recorded before")]
             if action == "claim":
                 packet["dependency_revisions"] = dependency_revisions
                 packet.pop("taken_over", None)

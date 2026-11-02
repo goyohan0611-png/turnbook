@@ -69,6 +69,26 @@ class WorkStateTests(unittest.TestCase):
                                              expected_revision=3)["reason"],
                                  "NOT_ACTIVE_OWNER")
 
+    def test_completing_drops_the_stale_next_action_and_marks_old_checks(self):
+        """Real-app smoke: Codex completed after running the tests, without restating checks;
+        the packet still said "unittest not run yet" and "next: run unittest"."""
+        with tempfile.TemporaryDirectory() as folder:
+            with WorkState(Path(folder) / "brain.sqlite") as work:
+                work.change("claim", "C:/p", agent="codex:a", expected_revision=0,
+                            objective="sub()")
+                work.change("checkpoint", "C:/p", agent="codex:a", expected_revision=1,
+                            next_action="run unittest", checks=["unittest not run yet"])
+                done = work.change("complete", "C:/p", agent="codex:a",
+                                   expected_revision=2)["work"]
+                self.assertEqual(done["next_action"], "")
+                self.assertEqual(done["checks"],
+                                 ["(recorded before completion) unittest not run yet"])
+                work.change("claim", "C:/p", agent="codex:a", expected_revision=3,
+                            objective="again")
+                restated = work.change("complete", "C:/p", agent="codex:a",
+                                       expected_revision=4, checks=["unittest: 2 passed"])
+                self.assertEqual(restated["work"]["checks"], ["unittest: 2 passed"])
+
     def test_quiet_reads_the_owners_transcript_and_turns(self):
         import os
         from datetime import datetime, timedelta, timezone

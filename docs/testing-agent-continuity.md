@@ -55,3 +55,31 @@ separate gates. Existing memory sync does not distribute `brain_work` tasks. Pas
 does not turn app/session labels into authentication or enforce filesystem edit locks.
 
 No installation, service restart, public push, tag or release was performed.
+
+## Real apps, disposable store (2026-11-02)
+
+Claude Code 2.1.316 (`claude -p`) and Codex CLI 0.160.1 (`codex exec`) on Windows, in one
+throwaway git folder, both connected only to this checkout's server on a temporary store
+(`--strict-mcp-config` / `--ignore-user-config`, hooks off, no session files kept). No real
+memory, hooks or capture service were involved.
+
+1. Claude, told to split the work: assigned `implement` and `verify` (depends on implement),
+   claimed `implement`, wrote `add()`, checkpointed and paused with "next: sub() and tests".
+2. Codex, told only **"이어서 해줘"**: listed the board, claimed the paused task with its
+   progress, wrote `sub()`, ran the tests (2 passed) and completed it. Nothing was repeated.
+3. A new Claude session, told only **"맡은 작업 있으면 해줘"**: claimed `verify`, received
+   Codex's result as inputs, ran the tests and completed it with the check recorded.
+
+Found and fixed on the way:
+- The first Codex run searched conversation memory (`brain_recall`) for "continue" and missed
+  the board: with no SessionStart hook nothing pointed it there. The server guide now says to
+  list the folder's work first when asked to continue.
+- Completing left "next: run unittest" and "unittest not run yet" from before the run: complete
+  now drops the next action and marks unrestated checks as recorded before completion.
+- Codex asks before every `brain_work` call (the tool can clear a packet, so it is marked
+  destructive); the run needed `mcp_servers.<name>.tools.brain_work.approval_mode="approve"`.
+  In daily use people will see that prompt until they allow it once. Not changed yet.
+
+Not covered here: SessionStart injection inside the real apps (hooks were off), the takeover
+of a worker that stopped without pausing (needs a captured transcript; unit-tested), and two
+interactive app windows at once.
