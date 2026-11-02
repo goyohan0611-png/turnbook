@@ -3,6 +3,13 @@
 Upgrade: `python -m pip install --upgrade turnbook`, then `turnbook-install`.
 Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 
+## Unreleased
+
+- **The per-message floor holds memories found by words too.** A saved memory that shared only
+  everyday words with a message ("그러면", "이제") skipped the 0.36 floor and came along: a
+  price list on "그러면 이제 2번 약점 고치자". Such memories are now measured by meaning as
+  well (while the model is loading they stay as found).
+
 ## 1.1.0 — 2026-11-02
 What the agent did is remembered, the memory added to each message is held to a measured floor,
 and Turnbook is a Claude Code plugin. Upgrading: `pip install -U turnbook && turnbook-install`,

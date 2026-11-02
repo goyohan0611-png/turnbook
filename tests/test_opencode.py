@@ -92,6 +92,18 @@ class OpenCodeTests(unittest.TestCase):
             self.assertTrue(context("얼마나 걸리나", database="db", embedder=object()))
         self.assertEqual([t["turn_id"] for t in seen["conversation_turns"]], ["b", "d"])
         self.assertEqual([m["title"] for m in seen["matches"]], ["close", "by words"])
+        # with the model there, a memory found only by words is measured too
+        for similarity, kept in ((0.1, ["close"]), (0.5, ["close", "by words"])):
+            with mock.patch("turnbook.mcp_server.gather", lambda *a, **k: {
+                    "status": "KNOWN", "conversation_turns": [],
+                    "matches": list(memories)}), \
+                    mock.patch("turnbook.mcp_server.memory_meaning",
+                               lambda e, q, texts, s=similarity: [s] * len(texts)), \
+                    mock.patch("turnbook.context_packet.build_context_pack", pack), \
+                    mock.patch("turnbook.local_embedder.LOCAL_MODEL",
+                               "onnx-community/embeddinggemma-300m-ONNX@onnx/model_q4.onnx"):
+                context("그러면 이제 2번 약점 고치자", database="db", embedder=object())
+            self.assertEqual([m["title"] for m in seen["matches"]], kept)
 
     def test_a_message_with_no_sign_of_the_past_gets_nothing(self):
         self.assertEqual(context("write a quicksort in rust"), "")

@@ -33,6 +33,22 @@ def _kept(items, floor):
     return [i for i in items if i.get("similarity") is None or i["similarity"] >= floor]
 
 
+def _measured(query, memories, embedder):
+    """Memories found by shared words get a similarity too, so the floor holds them as well:
+    "그러면" and "이제" brought a kiosk price list to "그러면 이제 2번 약점 고치자". Without the
+    model (still loading) they stay as found."""
+    unmeasured = [m for m in memories if m.get("similarity") is None]
+    if not unmeasured:
+        return memories
+    from turnbook.mcp_server import memory_meaning
+    scores = memory_meaning(embedder, query, [m.get("title", "") + "\n" + m.get("content", "")
+                                              for m in unmeasured])
+    if not scores:
+        return memories
+    measured = {id(m): s for m, s in zip(unmeasured, scores)}
+    return [{**m, "similarity": measured[id(m)]} if id(m) in measured else m for m in memories]
+
+
 def _echo(text, said):
     from difflib import SequenceMatcher
     text = "".join(str(text).split())
@@ -65,9 +81,12 @@ def context(query: str, *, database=None, embedder=None) -> str:
     database = database or configured_db_path()
     from turnbook.local_embedder import LOCAL_MODEL
     # twice the candidates: the floor and the echo check leave room for the next ones
-    recalled = gather(database, query, as_of=_now(), limit=2 * LIMIT,
-                      embedder=embedder or embedder_for(database), share=False)
+    embedder = embedder or embedder_for(database)
+    recalled = gather(database, query, as_of=_now(), limit=2 * LIMIT, embedder=embedder,
+                      share=False)
     floor = HOOK_FLOORS.get(LOCAL_MODEL, 0.0)
+    if floor:
+        recalled["matches"] = _measured(query, recalled.get("matches", []), embedder)
     # an earlier message with (nearly) these letters says nothing new: "했어" brought back four
     # older "했어", "얼마나 걸리나" four "얼마나 걸려" (and the message itself, once stored).
     # Letters only, no judgement of meaning.
