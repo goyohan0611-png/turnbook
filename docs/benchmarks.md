@@ -51,8 +51,9 @@ Five whole sessions are agentmemory's unit of retrieval and its best case here: 
 reads about five times what Turnbook gives it. Per-question files:
 [`research/runs/graph-v9.6-rival-agentmemory-k5`](../research/runs/graph-v9.6-rival-agentmemory-k5).
 
-The retrieval number itself, on agentmemory's terms (is an answer session among the first K
-retrieved?), from `bench/evidence.py` in CI. Turnbook retrieves turns, not sessions; its
+The older retrieval baseline below (commit `ceddf56`, 2026-10-19) uses agentmemory's definition
+(is an answer session among the first K retrieved?), from `bench/evidence.py` in CI. It is not a
+measurement of the current EmbeddingGemma checkout. Turnbook retrieves turns, not sessions; its
 sessions are counted in the order their first turn ranks. Its 479 questions are those with an
 answer-bearing turn; agentmemory's 500 include the abstention questions, and on its 470
 non-abstention ones it scores 95.1% / 98.5%.
@@ -61,6 +62,18 @@ non-abstention ones it scores 95.1% / 98.5%.
 |---|---|---|
 | **Turnbook** (479 questions) | **98.5%** | **99.2%** |
 | agentmemory hybrid (500) | 95.2% | 98.6% |
+
+Separately, an **offline replay of the frozen EmbeddingGemma answer packets** above finds a gold
+session among the first 5 distinct sessions in 466/470 non-abstention questions (99.15%), and
+among the first 10 in 470/470 (100%). All 500 packets are present; 30 abstention questions are
+explicitly excluded. Sessions are counted in their first-occurrence order **inside the packed
+context**, so this is `packet_session_hit@K`, not a fresh retrieval run or answer accuracy. It
+cannot measure answer-turn coverage or recover candidates the packet discarded. The reranker
+training caveat above still applies; this is not a new blind result.
+
+Reproduce without model calls:
+`python bench/cached_sessions.py research/runs/graph-v9.14-full500-mpnet8-gemma --out report.json`.
+The [recorded result](../bench/baseline/cached-gemma-session-recall.json) includes input hashes.
 
 ## Reading other published numbers
 

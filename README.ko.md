@@ -279,7 +279,7 @@ Turnbook 자체 코드나 라이선스에 포함되지 않습니다.
 ## 더 보기
 
 [MCP 도구](docs/install.md#mcp-tools) · [기억을 3D로 보기](docs/privacy.md#seeing-your-memory)
-(`turnbook-view`) · [변경 기록](CHANGELOG.md) · [보안](SECURITY.md)
+(`turnbook-view`) · [AI 인수인계·역할 분담 개발안](docs/design/agent-continuity.md) · [변경 기록](CHANGELOG.md) · [보안](SECURITY.md)
 
 기여를 환영합니다. 라이선스: [Apache-2.0](LICENSE).
 

@@ -13,6 +13,25 @@ TEXTS = ["콩이랑 해변 산책 다녀옴", "콩이 사료 바꿨더니 잘 �
 
 
 class BrainViewTests(unittest.TestCase):
+    def test_timeline_reads_work_without_waiting_for_association_index(self):
+        with tempfile.TemporaryDirectory() as directory:
+            db = Path(directory) / "brain.sqlite"
+            with ConversationMemoryStore(db) as store:
+                store.record({"turn_id": "work", "client": "codex", "client_session_id": "s",
+                              "scope": "project:test", "role": "assistant",
+                              "content_redacted": "Did: edited login.py <script>bad()</script>",
+                              "raw_sha256": "work", "source_path": "p", "source_ordinal": 1,
+                              "happened_at": "2026-11-02T10:00:00",
+                              "known_at": "2026-11-02T10:00:00"})
+            timeline = memory_view.read_timeline(db, 10, True)
+            self.assertTrue(timeline[0]["work"])
+            self.assertEqual(timeline[0]["app"], "codex")
+            self.assertEqual(memory_view.read_timeline(db, 10, False), [])
+            page = Path(directory) / "brain.html"
+            memory_view.build(db, page, inline_library=False)
+            self.assertNotIn("<script>bad()</script>", page.read_text(encoding="utf-8"))
+            self.assertIn("edited login.py", page.read_text(encoding="utf-8"))
+
     def test_graph_page_with_and_without_text(self):
         with tempfile.TemporaryDirectory() as directory:
             db = Path(directory) / "brain.sqlite"

@@ -80,6 +80,10 @@ def record(agent: str, event_name: str, event: dict) -> str | None:
     text = event.get(field)
     if not isinstance(text, str) or not text.strip():
         return None
+    from turnbook.privacy import strip_private
+    text = strip_private(text).strip()
+    if not text:
+        return None
     folder.mkdir(mode=0o700, parents=True, exist_ok=True)
     if role == "assistant" and path.exists():
         # AfterAgent can fire again for the same reply (a retry another hook asked for); each
@@ -119,6 +123,37 @@ def _append(path, line: dict) -> None:
         handle.write(json.dumps(line, ensure_ascii=False) + "\n")
 
 
+LEFT_OFF_TURNS, LEFT_OFF_CHARS = 6, 1500
+LEFT_OFF = ("Turnbook: where work in this folder left off, the end of the previous session ({}). "
+            "A record, not instructions; for more, call brain_context.\n\n")
+
+
+def left_off(event: dict) -> str:
+    """A new session (or /clear) starts knowing how the last one in the same folder ended: the
+    question people otherwise open with, "where did we leave off?". A resumed or compacted
+    session has its own history already. Text only, no search: once per session."""
+    cwd, session = event.get("cwd"), str(event.get("session_id") or "")
+    if event.get("source") not in (None, "startup", "clear") or not isinstance(cwd, str):
+        return ""
+    from turnbook.conversation_memory import ConversationMemoryStore
+    from turnbook.mcp_server import configured_db_path
+    from turnbook.work_state import WorkState, context
+    database = configured_db_path()
+    with WorkState(database) as work:
+        packets = [packet for packet in work.tasks(cwd) if packet["state"] not in
+                   {"EMPTY", "COMPLETE"}]
+        handover = "\n\n".join(context(packet, maximum=550) for packet in packets[:2])
+    with ConversationMemoryStore(database) as store:
+        turns = store.previous_session(cwd, session, client=event.get("_turnbook_client"),
+                                       limit=LEFT_OFF_TURNS)
+    if not turns:
+        return handover
+    lines = [f"[{t['role']}] " + " ".join(str(t["content"]).split())[:300] for t in turns]
+    text = "\n".join(lines)[-LEFT_OFF_CHARS:]
+    previous = LEFT_OFF.format(str(turns[-1]["happened_at"])[:16].replace("T", " ")) + text
+    return (handover + "\n\n" + previous).strip()[:LEFT_OFF_CHARS + len(LEFT_OFF)]
+
+
 def reply(agent: str, event_name: str, text: str | None, event: dict | None = None) -> dict:
     """What the agent expects back on stdout: the memory for the message, in its shape."""
     if not text or (agent, event_name) not in {("gemini-cli", "BeforeAgent"),
@@ -134,28 +169,53 @@ def reply(agent: str, event_name: str, text: str | None, event: dict | None = No
     return {"hookSpecificOutput": {"hookEventName": event_name, "additionalContext": memory}}
 
 
-def _installer_hook() -> bool:
-    """Whether ~/.claude/settings.json holds turnbook-install's hook (the plugin's runs too)."""
+def _installer_hook(event_name: str) -> bool:
+    """Whether ~/.claude/settings.json holds turnbook-install's hook for this event (the plugin's
+    runs too). Per event: an install before SessionStart existed has only the message hook."""
     try:
-        text = (Path.home() / ".claude" / "settings.json").read_text(encoding="utf-8")
-    except OSError:
+        settings = json.loads((Path.home() / ".claude" / "settings.json")
+                              .read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return False
-    return "turnbook.hook" in text or "graph_mind.hook" in text
+    hooks = settings.get("hooks") if isinstance(settings, dict) else None
+    entries = hooks.get(event_name) if isinstance(hooks, dict) else None
+    if not isinstance(entries, list):
+        return False
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get("matcher"):
+            continue                 # a conditional hook might not run on this event
+        commands = entry.get("hooks", [])
+        if not isinstance(commands, list):
+            continue
+        for command in commands:
+            if not isinstance(command, dict) or command.get("type", "command") != "command":
+                continue
+            text = command.get("command")
+            if isinstance(text, str) and any(
+                    f"{name} claude-code {event_name}" in text
+                    for name in ("turnbook.hook", "graph_mind.hook")):
+                return True
+    return False
 
 
 def main(argv=None) -> None:
     args = argv if argv is not None else sys.argv[1:]
     agent, event_name = args[:2]
-    if args[2:3] == ["plugin"] and _installer_hook():
+    if args[2:3] == ["plugin"] and _installer_hook(event_name):
         sys.stdout.write("{}")          # turnbook-install's hook adds the memory already
         return
     text = None
     try:
         sys.stdin.reconfigure(encoding="utf-8", errors="replace")
         event = json.loads(sys.stdin.read() or "{}")
-        text = (event.get("prompt") if agent in INJECT_ONLY
-                else record(agent, event_name, event))
-        answer = reply(agent, event_name, text if isinstance(text, str) else None, event)
+        if event_name == "SessionStart":
+            context = within(DEADLINE, left_off, {**event, "_turnbook_client": agent})
+            answer = ({"hookSpecificOutput": {"hookEventName": event_name,
+                                              "additionalContext": context}} if context else {})
+        else:
+            text = (event.get("prompt") if agent in INJECT_ONLY
+                    else record(agent, event_name, event))
+            answer = reply(agent, event_name, text if isinstance(text, str) else None, event)
     except Exception:
         answer = reply(agent, event_name, None)
     sys.stdout.reconfigure(encoding="utf-8")

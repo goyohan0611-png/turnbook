@@ -1,0 +1,90 @@
+{
+  "metric": "packet_session_hit@K",
+  "ranking": "first session occurrence in packet",
+  "questions_total": 500,
+  "abstention_excluded": 30,
+  "missing_packets": [],
+  "all": {
+    "questions": 470,
+    "session_hits": {
+      "5": 466,
+      "10": 470
+    },
+    "packet_session_hit@5": 0.9914893617021276,
+    "packet_session_hit@10": 1.0,
+    "packet_tokens_median": 3122.5
+  },
+  "by_type": {
+    "knowledge-update": {
+      "questions": 72,
+      "session_hits": {
+        "5": 72,
+        "10": 72
+      },
+      "packet_session_hit@5": 1.0,
+      "packet_session_hit@10": 1.0,
+      "packet_tokens_median": 3134.0
+    },
+    "multi-session": {
+      "questions": 121,
+      "session_hits": {
+        "5": 119,
+        "10": 121
+      },
+      "packet_session_hit@5": 0.9834710743801653,
+      "packet_session_hit@10": 1.0,
+      "packet_tokens_median": 3128
+    },
+    "single-session-assistant": {
+      "questions": 56,
+      "session_hits": {
+        "5": 56,
+        "10": 56
+      },
+      "packet_session_hit@5": 1.0,
+      "packet_session_hit@10": 1.0,
+      "packet_tokens_median": 3750.0
+    },
+    "single-session-preference": {
+      "questions": 30,
+      "session_hits": {
+        "5": 29,
+        "10": 30
+      },
+      "packet_session_hit@5": 0.9666666666666667,
+      "packet_session_hit@10": 1.0,
+      "packet_tokens_median": 2851.5
+    },
+    "single-session-user": {
+      "questions": 64,
+      "session_hits": {
+        "5": 64,
+        "10": 64
+      },
+      "packet_session_hit@5": 1.0,
+      "packet_session_hit@10": 1.0,
+      "packet_tokens_median": 2992.0
+    },
+    "temporal-reasoning": {
+      "questions": 127,
+      "session_hits": {
+        "5": 126,
+        "10": 127
+      },
+      "packet_session_hit@5": 0.9921259842519685,
+      "packet_session_hit@10": 1.0,
+      "packet_tokens_median": 3137
+    }
+  },
+  "limits": [
+    "Frozen packet replay, not a run of the current checkout",
+    "No answer accuracy or answer-turn coverage measured",
+    "Packing may have discarded higher-ranked retriever candidates",
+    "Existing reranker used LongMemEval training data; not a blind result"
+  ],
+  "run": "graph-v9.14-full500-mpnet8-gemma",
+  "sha256": {
+    "questions.json": "e3c8ace54d3f00330cec2ba1566e4e76427ecba1490fdbcfcb58ac05edf2a464",
+    "spans.jsonl": "28bb709581a690355c196910390e1fc66bc9bc849a66fc567e80dfe9d707879c"
+  }
+}

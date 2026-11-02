@@ -287,10 +287,41 @@ class HookTests(unittest.TestCase):
                           run("claude-code", "UserPromptSubmit", prompt, "plugin"))
             (Path(directory) / ".claude").mkdir()
             (Path(directory) / ".claude" / "settings.json").write_text(
-                '{"hooks": {"UserPromptSubmit": [{"command": "py -m turnbook.hook"}]}}',
-                encoding="utf-8")
+                '{"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": '
+                '"py -m turnbook.hook claude-code UserPromptSubmit"}]}]}}', encoding="utf-8")
             self.assertEqual(run("claude-code", "UserPromptSubmit", prompt, "plugin"), {})
             self.assertIn("hookSpecificOutput", run("claude-code", "UserPromptSubmit", prompt))
+            # an install from before SessionStart: the plugin's session hook still runs
+            with mock.patch("turnbook.hook.left_off", lambda event: "LEFT OFF"):
+                self.assertEqual(run("claude-code", "SessionStart", {"source": "startup"},
+                                     "plugin")["hookSpecificOutput"]["additionalContext"],
+                                 "LEFT OFF")
+
+    def test_a_new_session_starts_where_the_last_one_in_the_folder_ended(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "brain.sqlite"
+            with ConversationMemoryStore(database) as store:
+                for n, (session, cwd, role, text) in enumerate([
+                        ("old", "C:/work", "user", "first session"),
+                        ("prev", "C:/work", "user", "fix the login bug"),
+                        ("prev", "C:/work", "assistant", "Did:\nedited login.py"),
+                        ("prev", "C:/elsewhere", "user", "another folder"),
+                        ("now", "C:/work", "user", "this session")]):
+                    store.record({"turn_id": f"t{n}", "client": "claude-code",
+                                  "client_session_id": session, "scope": "global", "cwd": cwd,
+                                  "role": role, "content_redacted": text, "raw_sha256": f"h{n}",
+                                  "source_path": session, "source_ordinal": n,
+                                  "happened_at": f"2026-11-0{n + 1}T10:00:00",
+                                  "known_at": f"2026-11-0{n + 1}T10:00:00"})
+            with mock.patch("turnbook.mcp_server.configured_db_path", lambda: database):
+                text = hook.left_off({"cwd": "C:/work", "session_id": "now",
+                                      "source": "startup"})
+                self.assertTrue(text.endswith("[user] fix the login bug\n"
+                                              "[assistant] Did: edited login.py"), text)
+                self.assertNotIn("first session", text)
+                self.assertEqual(hook.left_off({"cwd": "C:/work", "session_id": "now",
+                                                "source": "resume"}), "")
+                self.assertEqual(hook.left_off({"cwd": "C:/new", "session_id": "now"}), "")
 
     def test_the_message_hook_does_not_wait_on_the_shared_hub(self):
         """The memory servers pull other devices' lines; a hub connection per message added
@@ -407,6 +438,9 @@ class HookTests(unittest.TestCase):
             codex = json.loads((home / ".codex" / "hooks.json").read_text(encoding="utf-8"))
             self.assertIn("turnbook.hook codex UserPromptSubmit",
                           codex["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"])
+            for settings, agent in ((claude, "claude-code"), (codex, "codex")):
+                self.assertIn(f"turnbook.hook {agent} SessionStart",
+                              settings["hooks"]["SessionStart"][0]["hooks"][0]["command"])
             copilot = json.loads((home / ".copilot" / "hooks" / "turnbook.json")
                                  .read_text(encoding="utf-8"))
             self.assertEqual(copilot["version"], 1)

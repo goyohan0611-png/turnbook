@@ -130,8 +130,8 @@ Local models (Ollama) connect the same way, but need a PC that can run them: on 
 GPU, OpenCode's own prompt (~18,000 tokens) took ~27 minutes per turn with qwen3:4b, and even the
 memory tools alone timed out. Not yet measured on a GPU.
 
-OpenCode's conversations are not captured yet (Claude Code's and Codex's are): there, what the
-model saves with `brain_remember` is the memory.
+OpenCode's conversations are now captured by the installed plugin; a manual MCP connection alone
+provides the tools, while `turnbook-install` adds capture and per-message memory injection.
 
 ## MCP tools
 
@@ -144,6 +144,7 @@ model saves with `brain_remember` is the memory.
 | `brain_forget` | "delete the password I typed": lists masked candidates, deletes only what you pick, everywhere |
 | `code_activity` | what changed in a project, file or symbol, and when (when a code folder is watched) |
 | `brain_checkpoint` | [project brains](teams.md), for teams that use them |
+| `brain_work` (unreleased prototype) | local task assignment, progress and handover between connected agents; [protocol and limits](design/agent-continuity.md) |
 
 Few tools on purpose: every tool's description is read by the model on every turn, and similar
 tools get confused with each other.

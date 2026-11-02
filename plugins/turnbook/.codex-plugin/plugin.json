@@ -1,6 +1,6 @@
 {
   "name": "turnbook",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Local memory for Codex: saves every conversation on your PC and finds the past turns that answer a request. No LLM calls to save, nothing leaves the machine.",
   "author": {
     "name": "Yohan Ko",

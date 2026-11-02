@@ -233,11 +233,12 @@ def _hook_files(home: Path) -> list:
         for event, matcher in (("BeforeAgent", "*"), ("AfterAgent", "*"),
                                ("AfterTool", "brain_forget"))}
     # the others' conversations are read from their transcripts: these hooks only add the
-    # memory for each message (turnbook.hook.INJECT_ONLY)
+    # memory for each message (turnbook.hook.INJECT_ONLY), and where the last session in the
+    # folder left off when a new one starts (turnbook.hook.left_off)
     def prompt(agent):
-        return {"UserPromptSubmit": {"hooks": [{
-            "type": "command", "timeout": 20,
-            "command": _plain_command(agent, "UserPromptSubmit")}]}}
+        return {event: {"hooks": [{"type": "command", "timeout": 20,
+                                   "command": _plain_command(agent, event)}]}
+                for event in ("UserPromptSubmit", "SessionStart")}
     shell = "powershell" if os.name == "nt" else "bash"
     copilot = {"userPromptTransformed": {
         "type": "command", "timeoutSec": 20, "env": ENV,

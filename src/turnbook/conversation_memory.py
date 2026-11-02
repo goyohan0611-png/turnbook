@@ -16,6 +16,7 @@ from turnbook.clock import timestamp
 from turnbook.forget import erase
 from turnbook.packing import COMPRESS_FROM, pack, unpack
 from turnbook.paths import use_wal
+from turnbook.privacy import strip_private
 
 CAPTURE_VERSION = "codex-conversation-capture-v0.1"
 # the start of the memory packet the per-message hook adds (inject.HEADER)
@@ -161,11 +162,13 @@ def masking_on():
 
 
 def _redact(value, *, preserve_source=False):
-    cleaned = value if preserve_source else AGENT_INSTRUCTIONS.sub(
-        "", AUTOMATIC_BLOCKS.sub("", value))
+    public = strip_private(value)
+    private_count = int(public != value)
+    cleaned = public if preserve_source else AGENT_INSTRUCTIONS.sub(
+        "", AUTOMATIC_BLOCKS.sub("", public))
     if not masking_on():
-        return (cleaned if preserve_source else cleaned.strip()), 0
-    count = 0
+        return (cleaned if preserve_source else cleaned.strip()), private_count
+    count = private_count
     for pattern, replacement in SECRET_PATTERNS:
         before = cleaned.count("[REDACTED")
         cleaned = pattern.sub(replacement, cleaned)
@@ -303,6 +306,11 @@ class ConversationMemoryStore:
           ON conversation_turns(client_session_id,happened_at);
         CREATE INDEX IF NOT EXISTS conversation_source
           ON conversation_turns(source_path,source_ordinal);
+        CREATE INDEX IF NOT EXISTS conversation_workspace_time
+          ON conversation_turns(cwd,happened_at DESC,revision DESC);
+        CREATE INDEX IF NOT EXISTS conversation_windows_workspace_time
+          ON conversation_turns(replace(cwd,char(92),'/') COLLATE NOCASE,
+                                happened_at DESC,revision DESC);
         CREATE VIRTUAL TABLE IF NOT EXISTS conversation_turns_fts USING fts5(
           content_redacted, content='conversation_turns', content_rowid='revision',
           tokenize='unicode61');
@@ -416,6 +424,41 @@ class ConversationMemoryStore:
                     value = parsed.astimezone().replace(tzinfo=None).isoformat(
                         timespec="microseconds")
         return timestamp(value, self.clock).isoformat(timespec="microseconds")
+
+    def previous_session(self, cwd, session_id, *, client=None, limit=6):
+        """The last conversation in this exact workspace, across apps, oldest turn first.
+
+        Documents are searchable evidence, not a work session. A session id is namespaced by
+        its app; two apps using the same id must not merge their conversations. Windows paths
+        compare without case or separator differences, while POSIX paths stay case-sensitive.
+        """
+        from pathlib import PurePosixPath, PureWindowsPath
+        import ntpath
+        import posixpath
+
+        if not isinstance(cwd, str) or not cwd.strip() or not session_id:
+            return []
+        if PureWindowsPath(cwd).is_absolute():
+            workspace = "replace(cwd,char(92),'/') COLLATE NOCASE = ?"
+            folder = ntpath.normpath(cwd).replace("\\", "/")
+        elif PurePosixPath(cwd).is_absolute():
+            workspace, folder = "cwd = ?", posixpath.normpath(cwd)
+        else:
+            return []
+        latest = self.db.execute(
+            "SELECT client,client_session_id FROM conversation_turns WHERE " + workspace +
+            " AND role IN ('user','assistant') AND client <> 'document'"
+            " AND NOT (client_session_id=? AND (? IS NULL OR client=?))"
+            " ORDER BY happened_at DESC,revision DESC LIMIT 1",
+            (folder, str(session_id), client, client)).fetchone()
+        if latest is None:
+            return []
+        rows = self.db.execute(
+            "SELECT * FROM conversation_turns WHERE " + workspace +
+            " AND client=? AND client_session_id=? AND role IN ('user','assistant')"
+            " ORDER BY happened_at DESC,revision DESC LIMIT ?",
+            (folder, latest["client"], latest["client_session_id"], max(1, min(int(limit), 30))))
+        return [self._turn(row) for row in rows][::-1]
 
     def record(self, turn):
         required = ("turn_id", "client", "client_session_id", "scope", "role",

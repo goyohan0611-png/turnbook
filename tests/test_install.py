@@ -225,7 +225,8 @@ class InstallTests(unittest.TestCase):
                 install.main(["--skip-packages", "--skip-model", "--no-start", "--yes"])
             hooks = json.loads((home / ".claude" / "settings.json").read_text(encoding="utf-8"))
             commands = json.dumps(hooks)
-            self.assertEqual(commands.count("turnbook.hook"), 1)
+            for event in ("UserPromptSubmit", "SessionStart"):
+                self.assertEqual(json.dumps(hooks["hooks"][event]).count("turnbook.hook"), 1)
             self.assertNotIn("graph_mind.hook", commands)
             self.assertEqual([item for item in old_items if item.exists()], [])
             settings = json.loads((opencode / "opencode.json").read_text(encoding="utf-8"))

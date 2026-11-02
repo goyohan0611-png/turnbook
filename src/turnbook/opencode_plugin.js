@@ -16,8 +16,31 @@ const PYTHON = __PYTHON__;
 const TRANSCRIPTS = __TRANSCRIPTS__;
 const INJECT_TIMEOUT_MS = 5000;     // the Python side stops itself after 3 s
 
+// Explicit opt-out is applied before even the temporary capture transcript is written.
+function publicText(text) {
+  const parts = [];
+  let depth = 0, start = 0;
+  for (const match of text.matchAll(/<\/?private\s*>/gi)) {
+    const closing = match[0].startsWith("</");
+    if (depth === 0) parts.push(text.slice(start, match.index));
+    if (closing) {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) start = match.index + match[0].length;
+    } else {
+      if (depth === 0 && parts.at(-1) && !parts.at(-1).endsWith("\n")) parts.push("\n");
+      depth += 1;
+    }
+  }
+  if (depth === 0) parts.push(text.slice(start));
+  return parts.join("");
+}
+
 function write(sessionID, record) {
   try {
+    if (typeof record.message?.content === "string") {
+      record.message.content = publicText(record.message.content).trim();
+      if (!record.message.content) return;
+    }
     mkdirSync(TRANSCRIPTS, { recursive: true, mode: 0o700 });   // what was typed: this user only
     const fd = openSync(join(TRANSCRIPTS, sessionID + ".jsonl"), "a", 0o600);
     try {   // a file made before 0.9.14 kept its 0644: the mode above applies only to new ones

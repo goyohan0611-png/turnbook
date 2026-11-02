@@ -33,6 +33,27 @@ def read_graph(db_path, limit, with_text):
         db.close()
 
 
+def read_timeline(db_path, limit, with_text):
+    """Read recent captured turns even when the derived association index is still catching up."""
+    if not with_text:
+        return []
+    db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        if not db.execute("SELECT 1 FROM sqlite_master WHERE name='conversation_turns'").fetchone():
+            return []
+        packed = "content_z" if "content_z" in text_columns(db) else "NULL"
+        rows = db.execute(f"""SELECT client,client_session_id,scope,happened_at,role,
+                                     content_redacted,{packed}
+                              FROM conversation_turns WHERE role IN ('user','assistant')
+                              ORDER BY happened_at DESC,revision DESC LIMIT ?""", (limit,))
+        return [{"app": app, "session": session, "scope": scope, "when": when,
+                 "role": role, "text": unpack(text, compressed)[:1600],
+                 "work": unpack(text, compressed).lstrip().startswith("Did:")}
+                for app, session, scope, when, role, text, compressed in rows]
+    finally:
+        db.close()
+
+
 def _graph(db, limit, with_text):
     tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if "associative_engrams" not in tables:
@@ -155,19 +176,42 @@ html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
 #info b { display:block; margin-bottom:4px; } #info small { color:var(--dim); }
 button { position:fixed; bottom:16px; right:16px; background:var(--panel); color:var(--fg);
   border:1px solid #232a3a; border-radius:8px; padding:8px 12px; cursor:pointer; }
+[hidden] { display:none !important; }
+button:hover { border-color:#4d96ff; } :focus-visible { outline:2px solid #4d96ff; outline-offset:3px; }
+#head button { position:static; margin-top:10px; }
+#timeline { top:130px; bottom:68px; left:16px; width:620px; max-width:calc(100vw - 64px);
+  display:flex; flex-direction:column; padding:16px; background:#0e111af5; }
+#timeline h2 { margin:0; font-size:18px; } #timeline header { display:flex; justify-content:space-between; align-items:center; gap:20px; }
+#timeline button { position:static; }
+#timeline .filters { display:flex; gap:12px; flex-wrap:wrap; margin:14px 0 8px; }
+#timeline label { display:flex; flex-direction:column; gap:5px; color:var(--dim); font-size:12px; }
+#timeline .search { flex:1; min-width:160px; }
+#timeline input,#timeline select { font:inherit; color:var(--fg); background:#05060a; border:1px solid #343d50; border-radius:5px; padding:8px; }
+#timeline .work-filter { flex-direction:row; align-items:center; align-self:flex-end; min-height:36px; }
+#timeline-count { color:var(--dim); font-size:12px; margin:4px 0 12px; }
+#timeline-list { overflow:auto; flex:1; min-height:0; padding-right:8px; }
+#timeline details { border-top:1px solid #30384a; padding:12px 0; }
+#timeline summary { cursor:pointer; font-weight:600; color:#c9d7ee; }
+#timeline article { border-left:2px solid #30384a; padding:0 0 0 14px; margin:14px 0 20px 4px; }
+#timeline article.work { border-color:#2ec4b6; }
+#timeline small { color:var(--dim); } #timeline p { white-space:pre-wrap; overflow-wrap:anywhere; margin:5px 0 0; }
+.timeline-open #info { visibility:hidden; }
+@media(max-width:520px) { #timeline { top:142px; } #timeline .filters { gap:8px; } }
 </style></head><body>
 <div id="graph"></div>
-<div class="panel" id="head"><h1>Turnbook</h1><p id="stats"></p></div>
+<div class="panel" id="head"><h1>Turnbook</h1><p id="stats"></p><button id="open-timeline" aria-expanded="false" aria-controls="timeline">Sessions &amp; work</button></div>
 <div class="panel" id="legend"></div>
 <div class="panel" id="info"></div>
+<section class="panel" id="timeline" aria-label="Session timeline" hidden>
+<header><h2>Sessions &amp; work</h2><button id="close-timeline" aria-label="Close timeline">Close</button></header>
+<div class="filters"><label class="search">Search<input id="timeline-query" type="search" placeholder="A decision, file or conversation"></label>
+<label>Project<select id="timeline-scope"><option value="">All projects</option></select></label>
+<label class="work-filter"><input id="timeline-work" type="checkbox">Work only</label></div>
+<p id="timeline-count" aria-live="polite"></p><div id="timeline-list"></div>
+</section>
 <button id="spin">Pause rotation</button>
 __LIBRARY__
 <script>
-if (typeof ForceGraph3D === "undefined") {
-  document.getElementById("graph").innerHTML = '<p style="padding:120px 24px;text-align:center;color:#8a93a6">' +
-    "The 3D library did not load. Run <code>turnbook-view</code> again while online: it is then kept inside this page.</p>";
-  throw new Error("3d-force-graph not loaded");
-}
 const DATA = __DATA__;
 const regions = DATA.regions, grey = "#4a5266";
 const color = n => n.region >= 0 ? regions[n.region].color : grey;
@@ -177,6 +221,51 @@ document.getElementById("legend").innerHTML = regions.map(r =>
   `<div><i style="background:${r.color}"></i><span>${r.words.length ? r.words.join(" · ") : "region"} <small style="color:var(--dim)">(${r.size})</small></span></div>`).join("");
 const info = document.getElementById("info");
 const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const timeline = document.getElementById("timeline"), openTimeline = document.getElementById("open-timeline");
+const query = document.getElementById("timeline-query"), scope = document.getElementById("timeline-scope");
+const workOnly = document.getElementById("timeline-work"), list = document.getElementById("timeline-list");
+for (const name of [...new Set(DATA.timeline.map(t => t.scope))].sort()) {
+  const option = document.createElement("option"); option.value = name; option.textContent = name; scope.append(option);
+}
+function renderTimeline(cap=100) {
+  const q = query.value.trim().toLocaleLowerCase();
+  const matched = DATA.timeline.filter(t => (!scope.value || t.scope === scope.value) &&
+    (!workOnly.checked || t.work) && (!q || [t.text,t.app,t.scope].join(" ").toLocaleLowerCase().includes(q)));
+  document.getElementById("timeline-count").textContent = DATA.textIncluded ?
+    `${matched.length} matching turns in this snapshot · showing ${Math.min(cap,matched.length)} · up to 1,600 characters per turn` :
+    "Text was left out of this page. Run turnbook-view without --no-text to see sessions.";
+  list.replaceChildren(); const groups = new Map();
+  for (const t of matched.slice(0,cap)) {
+    const key = JSON.stringify([t.app,t.session]);
+    if (!groups.has(key)) groups.set(key, []); groups.get(key).push(t);
+  }
+  for (const turns of groups.values()) {
+    const group = document.createElement("details"), heading = document.createElement("summary"), t = turns[0];
+    group.open = groups.size < 4;
+    heading.textContent = `${t.app} · ${t.when.slice(0,10)} · ${t.scope} · session ${t.session.slice(-8)}`;
+    group.append(heading);
+    for (const turn of [...turns].reverse()) {
+      const entry = document.createElement("article"), meta = document.createElement("small"), text = document.createElement("p");
+      if (turn.work) entry.className = "work";
+      meta.textContent = `${turn.when.slice(0,16).replace("T"," ")} · ${turn.work ? "Work record" : turn.role}`;
+      text.textContent = turn.text; entry.append(meta,text); group.append(entry);
+    }
+    list.append(group);
+  }
+  if (!matched.length && DATA.textIncluded) { const p=document.createElement("p"); p.textContent="No matching turns in this snapshot."; list.append(p); }
+  if (matched.length > cap) { const more=document.createElement("button"); more.textContent="Show 100 more"; more.onclick=()=>renderTimeline(cap+100); list.append(more); }
+}
+function showTimeline(show) {
+  timeline.hidden = !show; openTimeline.setAttribute("aria-expanded", String(show));
+  document.body.classList.toggle("timeline-open", show);
+  if (show) { renderTimeline(); query.focus(); } else openTimeline.focus();
+}
+openTimeline.onclick=()=>showTimeline(timeline.hidden);
+document.getElementById("close-timeline").onclick=()=>showTimeline(false);
+document.addEventListener("keydown", e=>{if(e.key==="Escape" && !timeline.hidden) showTimeline(false);});
+query.oninput=()=>renderTimeline(); scope.onchange=()=>renderTimeline(); workOnly.onchange=()=>renderTimeline();
+function drawGraph() {
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const graph = ForceGraph3D()(document.getElementById("graph"))
   .backgroundColor("#05060a")
   .nodeColor(color)
@@ -195,7 +284,7 @@ const graph = ForceGraph3D()(document.getElementById("graph"))
   })
   .onNodeClick(n => {
     const d = 120 / Math.hypot(n.x, n.y, n.z), k = 1 + d;
-    graph.cameraPosition({x: n.x * k, y: n.y * k, z: n.z * k}, n, 1200);
+    graph.cameraPosition({x: n.x * k, y: n.y * k, z: n.z * k}, n, reducedMotion ? 0 : 1200);
   });
 // each region gathers around its own point on a sphere: lobes instead of one mixed ball
 const centers = regions.map((_, i) => {
@@ -219,11 +308,18 @@ graph.d3Force("link").strength(l => l.kind === "SHARED_CUE" ? 0.05 : 0.01);
 // data last, once every force is in place: reheating a layout that did not exist yet threw
 // "reading 'tick'" on every frame and left the page black
 graph.graphData({nodes: DATA.nodes, links: DATA.links});
-let angle = 0, spinning = true;
+let angle = 0, spinning = !reducedMotion;
+document.getElementById("spin").textContent = spinning ? "Pause rotation" : "Rotate";
 setInterval(() => { if (!spinning) return; angle += 0.0025;
   const r = 900; graph.cameraPosition({x: r * Math.sin(angle), z: r * Math.cos(angle)}); }, 30);
 document.getElementById("spin").onclick = e => {
   spinning = !spinning; e.target.textContent = spinning ? "Pause rotation" : "Rotate"; };
+}
+if (typeof ForceGraph3D !== "undefined") drawGraph();
+else {
+  document.getElementById("graph").innerHTML = '<p style="padding:155px 24px;text-align:center;color:#8a93a6">The 3D library is unavailable. Sessions &amp; work is still available.</p>';
+  document.getElementById("spin").hidden = true;
+}
 </script></body></html>
 """
 
@@ -271,7 +367,8 @@ def build(db_path, out, *, limit=4000, with_text=True, inline_library=True) -> d
         for region in legend:
             region["words"] = []
     since = min((n["when"] for n in nodes if n["when"]), default="")[:10]
-    data = {"nodes": nodes, "links": links, "regions": legend, "since": since}
+    data = {"nodes": nodes, "links": links, "regions": legend, "since": since,
+            "timeline": read_timeline(db_path, limit, with_text), "textIncluded": with_text}
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     page = PAGE.replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("<", "\\u003c"))

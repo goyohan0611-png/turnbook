@@ -12,5 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))   # this checkout, first
 
 os.environ["TURNBOOK_HOME"] = tempfile.mkdtemp(prefix="graph-mind-test-home-")
-for _name in ("TURNBOOK_CONFIG", "TURNBOOK_FOLDER", "TURNBOOK_DB"):
-    os.environ.pop(_name, None)
+for _prefix in ("TURNBOOK_", "GRAPH_MIND_"):
+    for _suffix in ("CONFIG", "FOLDER", "DB", "HOME"):
+        if _prefix + _suffix != "TURNBOOK_HOME":
+            os.environ.pop(_prefix + _suffix, None)

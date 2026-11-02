@@ -11,3 +11,5 @@ dist/
 build/
 *.egg-info/
 bench/.cache/
+# Local agent handovers may contain machine/session paths.
+.turnbook-handoff/

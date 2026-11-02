@@ -34,6 +34,17 @@ remember a key, tell it **where the key is**: *"my OpenAI key is in 1Password, u
 model runs on your own machines and you want keys remembered as typed, add
 `"mask_secrets": false` to `~/.turnbook/config.json`.
 
+## Leaving part of a message out
+
+In the next release, wrap text you do not want Turnbook to keep in `<private>...</private>`.
+Only the public part is captured, indexed or published to the shared memory; a message containing
+only a private block is skipped. An unclosed block hides everything after its opening tag. This
+works even with `mask_secrets` off, and also applies to explicit `brain_remember` content.
+
+This controls **Turnbook's copy**, not what you sent to the AI provider or the app's own transcript.
+It does not remove text stored by older versions, or an unmarked repetition of that text in a
+later reply. Use the deletion flow below for something already stored.
+
 ## Deleting something
 
 Ask your AI: *"delete the password I typed earlier"*. It lists masked candidates
@@ -77,6 +88,12 @@ a [project brain](teams.md) instead.
 `turnbook-view` opens your memory as a 3D graph in the browser (a local file,
 `~/.turnbook/brain.html`; only the 3D library is fetched from a CDN). Use `--no-text` before you
 screenshot or share it.
+
+The next release also includes a read-only **Sessions & work** timeline with project, text and
+work-record filters. It shows a snapshot of recent captured turns, up to 1,600 characters each;
+rerun the command to refresh it. The HTML contains those excerpts as plain text. `--no-text`
+omits the timeline entirely. Editing and deletion remain available through the memory tools;
+the file itself does not edit the database.
 
 Vulnerabilities: report privately (GitHub **Security → Report a vulnerability**); see
 [SECURITY.md](../SECURITY.md).

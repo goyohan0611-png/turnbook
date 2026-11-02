@@ -4,7 +4,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "turnbook==1.1.0",
+        "turnbook==1.2.0",
         "turnbook"
       ],
       "env": {

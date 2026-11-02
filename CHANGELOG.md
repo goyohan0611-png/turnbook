@@ -5,6 +5,28 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 
 ## Unreleased
 
+- **Continue across agents, and split implementation from verification (local prototype).**
+  `brain_work` keeps a task's goal, owner, progress, next action, file/commit references and checks
+  in this PC's memory store. Assign separate tasks to apps or sessions, optionally depending on
+  completed tasks. Revision checks reject competing claims and delayed writes; verification
+  cannot complete against a dependency changed since it started. No automatic app launch,
+  quota failover or cross-PC task synchronization is included.
+- **New sessions start with the last work.** Claude Code/Codex installer hooks add SessionStart;
+  the Claude plugin has it too. Startup and clear receive bounded work packets and a short tail
+  from the previous conversation in the same folder. App/session ids stay separate; documents
+  and other folders are excluded. The hook exits within its deadline even if work is still slow.
+- **Explicit private blocks.** `<private>...</private>` is removed before capture, Gemini and
+  OpenCode staging, explicit saves, indexing and publication. An unclosed block hides the rest;
+  all-private messages are skipped, even with secret masking off. Original app histories and
+  text saved by an older version are not changed.
+- **Sessions & work in the local memory view.** A read-only timeline, project/text filters and
+  work-only `Did:` view alongside the graph, including turns not indexed yet. `--no-text` omits
+  the timeline. It remains usable without the 3D library. Browser visual QA is pending; data,
+  no-text isolation and JavaScript syntax checks pass.
+- **Comparable metrics, explicitly labeled.** Frozen Gemma packet session hit@5: 466/470;
+  hit@10: 470/470, excluding 30 abstention questions. Offline replay with input hashes, not a
+  current-checkout retrieval run, answer accuracy or a new blind result. The older retrieval
+  baseline is now dated so the two cannot be mistaken for the same run.
 - **Saved memories on each message: only those that stand out.** Saved memories are short, and
   on short Korean text every one scores 0.3-0.45 against any message, so the 0.36 floor (measured
   on conversation turns) let a kiosk price list through, and memories sharing only everyday

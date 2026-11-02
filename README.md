@@ -298,7 +298,7 @@ memory stays in `~/.turnbook` unless you add `--purge`.
 ## More
 
 [MCP tools](docs/install.md#mcp-tools) · [See your memory in 3D](docs/privacy.md#seeing-your-memory)
-(`turnbook-view`) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) ·
+(`turnbook-view`) · [Agent continuity prototype](docs/design/agent-continuity.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) ·
 Development: `pip install -r requirements.txt`, then `python -m unittest discover -s tests`
 
 Contributions are welcome. License: [Apache-2.0](LICENSE).
