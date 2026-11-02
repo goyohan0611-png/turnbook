@@ -20,7 +20,11 @@ const INJECT_TIMEOUT_MS = 5000;     // the Python side stops itself after 3 s
 function publicText(text) {
   const parts = [];
   let depth = 0, start = 0;
+  // written as code (`<private>` or in a ``` block) it is a mention, not a tag (privacy.py)
+  const code = [...text.matchAll(/```[\s\S]*?```|`[^`\n]+`/g)]
+    .map((m) => [m.index, m.index + m[0].length]);
   for (const match of text.matchAll(/<\/?private\s*>/gi)) {
+    if (code.some(([a, b]) => a <= match.index && match.index < b)) continue;
     const closing = match[0].startsWith("</");
     if (depth === 0) parts.push(text.slice(start, match.index));
     if (closing) {

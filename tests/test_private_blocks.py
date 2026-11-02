@@ -27,6 +27,10 @@ class PrivateBlockTests(unittest.TestCase):
             "safe<private>one<private>two</private>still private": "safe\n",
             "<private>never closed": "",
             "<private>one</private>A<private>two</private>B": "A\nB",
+            # a mention written as code is not a tag
+            "add a `<private>` marker, then test it": "add a `<private>` marker, then test it",
+            "```\n<private>\n```\nstill here": "```\n<private>\n```\nstill here",
+            "`<private>` vs <private>real</private>end": "`<private>` vs \nend",
         }
         for value, expected in cases.items():
             with self.subTest(value=value):
