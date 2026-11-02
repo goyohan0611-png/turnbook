@@ -57,7 +57,7 @@ Or from source:
 
 ```bash
 git clone https://github.com/goyohan0611-png/turnbook.git
-cd graph-mind
+cd turnbook
 pip install -e .
 turnbook-install
 ```
@@ -140,7 +140,7 @@ tools get confused with each other.
   needs. Install [vc_redist.x64.exe](https://aka.ms/vs/17/release/vc_redist.x64.exe), restart, and
   run the installer again.
 - **pip fails with "No such file or directory"**: Windows' 260-character path limit. Clone to a
-  short path such as `C:\graph-mind`, or enable long paths (the installer prints the command).
+  short path such as `C:\turnbook`, or enable long paths (the installer prints the command).
 
 ## Removing it
 

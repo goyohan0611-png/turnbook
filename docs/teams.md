@@ -21,8 +21,8 @@ drive or GitHub; the project brain is what lets another person's AI pick the wor
   so a page your AI read cannot rewrite what every teammate's AI follows.
 - **Members, as on GitHub**: whoever creates a project owns it. Owners add people (owner, editor or
   viewer), set the instructions and can retract anyone's checkpoint; editors publish; viewers read.
-  *"Invite Mina to the graph-mind project as an editor"* gives you a command to run in a
-  terminal (`turnbook team invite "Mina" --role editor --project "graph-mind"`), which prints a
+  *"Invite Mina to the turnbook project as an editor"* gives you a command to run in a
+  terminal (`turnbook team invite "Mina" --role editor --project "turnbook"`), which prints a
   code for her; her AI joins with it. Giving access and hosting are never done from a chat, so a
   page or file your AI reads cannot add someone. Every action, reads included, is audited.
 - When a project's hub cannot be reached, the assistant says the latest state is unknown instead of
