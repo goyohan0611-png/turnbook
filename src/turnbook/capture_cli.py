@@ -48,6 +48,8 @@ def main(argv=None):
     disable = commands.add_parser("workers-disable")
     disable.add_argument("--stop", action="store_true", help="also stop a running worker")
     commands.add_parser("workers-status")
+    commands.add_parser("workers-release", help="after checking a worker the service cannot "
+                        "identify has ended: forget it and pause its task")
     grant = commands.add_parser("workers-grant")
     grant.add_argument("--workspace", required=True)
     grant.add_argument("--task", required=True)

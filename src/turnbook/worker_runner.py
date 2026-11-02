@@ -235,7 +235,14 @@ class WorkerRunner:
             code = self._child.poll()
             alive = code is None
         else:                        # the service restarted: the pid, if still the worker
-            alive = self._is_worker(running)
+            identity = self._identity(running)
+            if identity == "unknown":
+                # no proof either way (lookup denied, no pid recorded): still tracked and
+                # claimed; `workers-release` once the user has checked it is gone
+                running["identity_unknown"] = _now()
+                self.save(policy)
+                return
+            alive = identity == "worker"
         stop = policy.get("stop")    # disabling alone lets a running review finish
         if alive and (stop or time.time() > running["deadline"]):
             if not self._kill(running):
@@ -266,11 +273,23 @@ class WorkerRunner:
         except Exception:
             return None
 
-    def _is_worker(self, running):
-        """After a restart or reboot the pid may be another program's: the same creation time
-        is what says it is still the worker."""
-        created = running.get("created")
-        return created is not None and self._created(running["pid"]) == created
+    @staticmethod
+    def _identity(running):
+        """"worker", "gone" or "unknown". After a restart or reboot the pid may be another
+        program's: the same creation time says it is still the worker; no such process or
+        another creation time says it ended. A lookup that fails (access denied) or a run whose
+        pid was never recorded proves nothing, and is not taken as an end."""
+        import psutil
+        pid, created = running.get("pid"), running.get("created")
+        if pid is None or created is None:
+            return "unknown"
+        try:
+            actual = psutil.Process(pid).create_time()
+        except psutil.NoSuchProcess:
+            return "gone"
+        except psutil.Error:
+            return "unknown"
+        return "worker" if actual == created else "gone"
 
     def _kill(self, running):
         """End the worker and everything it started (a shell, its tests), never another
@@ -343,6 +362,14 @@ def _cli(runner, command, args):
         policy["enabled"] = False
         if args.stop and policy.get("running"):
             policy["stop"] = True
+    elif command == "workers-release" and policy.get("running"):
+        # the user checked the worker is gone (an identity the service cannot confirm): its
+        # task is paused and launches resume
+        running = policy.pop("running")
+        policy.pop("stop", None)
+        policy["runs"][-1:] = [{**run, "ended": _now(), "exit": "released by the user"}
+                               for run in policy["runs"][-1:]]
+        runner._release(running, "released by the user")
     elif command == "workers-grant":
         from turnbook.work_state import task_key, workspace_key
         workspace_key(args.workspace)

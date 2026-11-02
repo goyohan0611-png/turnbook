@@ -140,6 +140,10 @@ given whole. Ending a run counts only once the process is shown to be gone: the 
 (creation time) is checked on the same process object that is killed, and a stop that cannot
 be confirmed (unknown identity, access denied) keeps the run tracked and its task claimed,
 marked `stop_unconfirmed`, and is retried at the next pass; nothing else starts meanwhile.
+After a service restart only proof ends a run: no such process, or the pid now has another
+creation time. A lookup that fails (access denied) or a run whose pid was never recorded is
+`identity_unknown`: still tracked and claimed. `turnbook-capture workers-release`, run by the
+user once they have checked that worker is gone, forgets it and pauses its task.
 
 The 10-minute limit has its own timer; `--stop` takes effect at the service's next pass
 (5 s by default). Known gap: if the service itself dies in the instant between starting the

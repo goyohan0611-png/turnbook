@@ -307,6 +307,71 @@ class WorkerRunnerTests(unittest.TestCase):
         with mock.patch("psutil.Process", refused):
             self.assertFalse(self.runner._kill({"pid": 1, "created": 17.0}))
 
+    def test_after_a_restart_an_unknown_identity_is_not_an_end(self):
+        """Desktop Codex cross-check 11-02: after a restart (_child None) a failed identity
+        lookup (access denied) was taken as an end and the live worker's task released. Only
+        no such process, or another creation time, ends it; the user can release it."""
+        import psutil
+        owner = "codex:auto-r"
+        with WorkState(self.db) as work:
+            work.change("claim", str(self.repo), agent=owner, expected_revision=1,
+                        task="verify")
+        self.runner._child = None
+        policy = self.runner.load()
+        policy["running"] = {"pid": 424242, "created": 17.0, "owner": owner, "task": "verify",
+                             "workspace": str(self.repo), "started": "x",
+                             "deadline": time.time() + 600}
+        policy["runs"] = [{"started": "x"}]
+        self.runner.save(policy)
+
+        def lookup(error):
+            def process(pid):
+                if isinstance(error, type) and issubclass(error, psutil.Error):
+                    raise error(pid)
+                found = mock.Mock()
+                found.create_time.return_value = error
+                return found
+            return process
+
+        def state():
+            with WorkState(self.db) as work:
+                return work.read(str(self.repo), "verify")["state"]
+        with mock.patch("psutil.Process", lookup(psutil.AccessDenied)):
+            self.runner.tick()
+        self.assertIn("identity_unknown", self.runner.load()["running"])
+        self.assertEqual(state(), "ACTIVE")
+        for no_pid in ({"pid": None}, {"created": None}):               # never recorded
+            policy = self.runner.load()
+            policy["running"].update(no_pid)
+            self.runner.save(policy)
+            self.runner.tick()
+            self.assertIsNotNone(self.runner.load().get("running"))
+            policy["running"].update(pid=424242, created=17.0)
+            self.runner.save(policy)
+        with mock.patch("psutil.Process", lookup(17.0)):                # still the worker
+            self.runner.tick()
+        self.assertEqual(state(), "ACTIVE")
+        with mock.patch("psutil.Process", lookup(psutil.NoSuchProcess)):  # shown gone
+            self.runner.tick()
+        self.assertIsNone(self.runner.load().get("running"))
+        self.assertEqual(state(), "PAUSED")
+
+    def test_the_user_can_release_a_worker_the_service_cannot_identify(self):
+        owner = "codex:auto-u"
+        with WorkState(self.db) as work:
+            work.change("claim", str(self.repo), agent=owner, expected_revision=1,
+                        task="verify")
+        policy = self.runner.load()
+        policy["running"] = {"pid": None, "created": None, "owner": owner, "task": "verify",
+                             "workspace": str(self.repo), "started": "x", "deadline": 0}
+        policy["runs"] = [{"started": "x"}]
+        self.runner.save(policy)
+        worker_runner.cli("workers-release", None, self.state, self.db)
+        self.assertIsNone(self.runner.load().get("running"))
+        self.assertEqual(self.runner.load()["runs"][-1]["exit"], "released by the user")
+        with WorkState(self.db) as work:
+            self.assertEqual(work.read(str(self.repo), "verify")["state"], "PAUSED")
+
     def test_an_unattended_run_ignores_the_users_codex_config(self):
         self.enable_and_grant()
         self.runner.tick()
