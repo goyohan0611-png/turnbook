@@ -92,3 +92,4 @@ jobs:
             research/runs/graph-v9.20-learning/scale*.json
             research/runs/graph-v9.14-full500-mpnet8-*/
             research/runs/graph-v9.23-hook-interference/
+            research/runs/graph-v9.24-hook-floor/
