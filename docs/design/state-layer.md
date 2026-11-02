@@ -99,3 +99,57 @@ judge: everything as in the 91.8% run except the state layer.
 
 Not decided by this experiment: which worker consolidates in production (Claude or Codex, the
 user's subscription), how often, and the user-facing view of state pages.
+
+## Product design (2026-11-02, after a first look at real output)
+
+One consolidation of a real haystack (07741c45, a knowledge-update question the shipped search
+misses) gave 158 lines in 182 s, and the answer as a value with its history: old sneakers
+"under the bed" (05-25) -> "shoe rack in the closet" (05-29). Lines averaged 254 characters:
+too long to put 30 in a 1,200-character hook packet. So: compact lines, and few of them.
+
+### Storage: the memories Turnbook already has
+
+No new store. A state line is a saved memory (`local_brain_memories`) that already has most of
+what it needs:
+
+- `about` + `attribute`: a later value replaces the earlier one and recall shows both (up to
+  five earlier values) - that is the `value` kind as it stands.
+- `attributes.from_turns`: the turns it was worked out from; a packet that holds the memory
+  leaves those turns out.
+- `effective_at`: when it became true (an event's date).
+
+Added: `attributes.kind` = value | event | item, and `memory_type = "state"` so they can be
+listed, counted and replaced as a layer. Content is one short line written for reading:
+`old sneakers: shoe rack in the closet (since 2023-05-29; before: under the bed, 2023-05-25)`.
+
+### Forgetting
+
+Forgetting a turn must take every memory derived from it. Today `erase` follows
+`semantic_ingestion_audit` (promoted copies) but not `attributes.from_turns`, so a note written
+from a turn the user deleted survives. Fixed first (it applies to existing notes too).
+
+### Updating: one tool, `brain_understand`
+
+- `next(scope?)`: up to N turns not yet folded in (oldest first, a cursor per scope), each with
+  a short ref (t1..tN), plus the current state lines for the subjects those turns touch. Text
+  is the stored (masked) text, `<private>` already gone.
+- `save(batch, lines)`: state lines citing refs; written as memories in one transaction
+  (values through about/attribute), and the cursor moves past the batch. A batch saved twice is
+  refused (the cursor already moved).
+
+Any attached agent can do it when asked; the worker runner gets a second role, `understand`
+(no git tree involved, same opt-in, grant per scope, daily cap). Nothing runs on its own.
+
+### Reading
+
+Unchanged paths: memories already go first in a packet (a quarter of the budget), the hook's
+stand-out rule applies to them, `brain_context` finds them by meaning and words. A state line
+is one short line, so several fit where one raw turn did.
+
+### Order of work
+
+1. forget follows `from_turns` (bug, independent)
+2. `brain_understand` next/save + cursor, tests
+3. compact line format, budget check on the pilot haystacks
+4. runner role `understand`
+5. the accuracy pilot (later; the user asked for features and speed first)
