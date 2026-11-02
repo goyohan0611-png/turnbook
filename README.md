@@ -328,8 +328,8 @@ question finds an English memory about as often: [In Korean](#in-korean).
 memory stays in `~/.turnbook` unless you add `--purge`.
 
 > [!NOTE]
-> **Beta.** Used daily on Windows. macOS and Linux pass every test in CI but have not seen daily
-> use yet.
+> Used daily on Windows. macOS and Linux pass every test in CI on every change, including an
+> upgrade from the previous release, but have seen less daily use: issues are welcome.
 
 ## More
 

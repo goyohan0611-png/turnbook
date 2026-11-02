@@ -16,7 +16,7 @@ keywords = ["mcp", "mcp-server", "memory", "agent-memory", "long-term-memory", "
             "local-first", "rag", "retrieval", "hybrid-search", "semantic-search",
             "conversational-memory", "chatbot-memory"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
