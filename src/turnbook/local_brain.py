@@ -76,11 +76,15 @@ def current_facts(memories, *, keep_earlier=5):
         else:
             plain.append(memory)
     for group in groups.values():
-        group.sort(key=lambda m: (m["effective_at"], m["known_at"], m["memory_id"]),
-                   reverse=True)
+        # an understood event or item is one thing told again: its newest version is the
+        # current one, even when the correction moved its date earlier
+        told = (group[0].get("attributes") or {}).get("kind") in {"event", "item"}
+        group.sort(key=lambda m: (m["known_at"], m["memory_id"]) if told else
+                   (m["effective_at"], m["known_at"], m["memory_id"]), reverse=True)
         plain.append({**group[0], "earlier": [
             {"memory_id": m["memory_id"], "content": m["content"],
-             "effective_at": m["effective_at"]} for m in group[1:1 + keep_earlier]]})
+             "effective_at": m["effective_at"], "attributes": m.get("attributes") or {}}
+            for m in group[1:1 + keep_earlier]]})
     return plain
 
 
@@ -98,6 +102,7 @@ class LocalBrainStore:
         use_wal(self.db)
         self.db.row_factory = sqlite3.Row
         self.closed = False
+        self.batch = False           # True: writes join the caller's transaction, no commit
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript("""
         CREATE TABLE IF NOT EXISTS local_brain_meta(
@@ -162,11 +167,21 @@ class LocalBrainStore:
     def _time(self, value):
         return timestamp(value, self.clock).isoformat(timespec="microseconds")
 
+    def _txn(self):
+        """The store's own commit, or none in batch mode (the caller commits)."""
+        import contextlib
+        return contextlib.nullcontext() if self.batch else self.db
+
     def remember(self, memory):
         if not isinstance(memory, dict):
             raise ValueError("LOCAL_MEMORY_OBJECT_REQUIRED")
         from turnbook.conversation_memory import _forgotten
         if _forgotten(self.db, memory.get("memory_id")):
+            return {"memory_id": memory.get("memory_id"), "disposition": "FORGOTTEN"}
+        cited = (memory.get("attributes") or {}).get("from_turns") \
+            if isinstance(memory.get("attributes"), dict) else None
+        if isinstance(cited, list) and any(_forgotten(self.db, turn) for turn in cited
+                                           if isinstance(turn, str)):
             return {"memory_id": memory.get("memory_id"), "disposition": "FORGOTTEN"}
         normalized = {
             "memory_id": _text(memory.get("memory_id"), "MEMORY_ID_REQUIRED"),
@@ -204,7 +219,7 @@ class LocalBrainStore:
             if existing["fingerprint"] != fingerprint:
                 raise ValueError("LOCAL_MEMORY_ID_COLLISION")
             if profile_requested:
-                with self.db:
+                with self._txn():
                     self._record_profile(normalized["memory_id"], profile,
                                          profile_fingerprint)
             return {"memory_id": normalized["memory_id"], "revision": existing["revision"],
@@ -230,7 +245,7 @@ class LocalBrainStore:
                 self.db.execute("PRAGMA foreign_keys=ON")
 
     def _insert(self, normalized, fingerprint, profile_requested, profile, profile_fingerprint):
-        with self.db:
+        with self._txn():
             cursor = self.db.execute("""INSERT INTO local_brain_memories(
               memory_id,scope,memory_type,title,content,effective_at,known_at,actor,
               tags_json,entities_json,provenance_json,supersedes_memory_id,fingerprint)

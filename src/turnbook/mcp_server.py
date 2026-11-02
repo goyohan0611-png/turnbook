@@ -804,6 +804,34 @@ def build_server(db_path=None, terminal=False):
     )
 
     @server.tool(
+        name="brain_understand", structured_output=True,
+        annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                                          idempotentHint=True, openWorldHint=False),
+    )
+    def brain_understand(action: Literal["next", "save"], scope: str = "global",
+                         batch: str | None = None,
+                         lines: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """Keep the brain's current understanding up to date, only when the user or a granted
+        task asks for it (not every chat). next: the turns of this scope not yet folded in, as
+        a fixed batch with short refs, plus existing state lines to reuse (their state_key).
+        save: the lines worked out from that batch (follow its guide; cite refs; may be empty),
+        all saved with the progress or none. Saving the same batch again with the same lines
+        answers the first result; STALE_BATCH means another agent saved first: call next."""
+        from turnbook.understanding import Understanding
+        try:
+            with Understanding(database) as understanding:
+                if action == "next":
+                    return understanding.next(scope)
+                if not batch:
+                    return {"status": "INVALID", "reason": "batch is required for save"}
+                result = understanding.save(batch, lines or [])
+            if result.get("status") == "OK" and result.get("saved"):
+                index_in_background(database)    # recall reads them now; search catches up
+            return result
+        except ValueError as error:
+            return {"status": "INVALID", "reason": str(error)}
+
+    @server.tool(
         name="brain_work", structured_output=True,
         annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=True,
                                           idempotentHint=False, openWorldHint=False),

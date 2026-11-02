@@ -107,49 +107,39 @@ misses) gave 158 lines in 182 s, and the answer as a value with its history: old
 "under the bed" (05-25) -> "shoe rack in the closet" (05-29). Lines averaged 254 characters:
 too long to put 30 in a 1,200-character hook packet. So: compact lines, and few of them.
 
-### Storage: the memories Turnbook already has
+### As built (2026-11-02, after Codex's design review)
 
-No new store. A state line is a saved memory (`local_brain_memories`) that already has most of
-what it needs:
+`src/turnbook/understanding.py`, MCP tool `brain_understand` (next / save).
 
-- `about` + `attribute`: a later value replaces the earlier one and recall shows both (up to
-  five earlier values) - that is the `value` kind as it stands.
-- `attributes.from_turns`: the turns it was worked out from; a packet that holds the memory
-  leaves those turns out.
-- `effective_at`: when it became true (an event's date).
+- **Progress is this PC's**, per scope (`global` when not given; a project scope is separate),
+  over turns in the order they arrived here (`conversation_turns.revision`), so a past
+  conversation imported late is not skipped. Tables `understand_progress` (last revision,
+  generation) and `understand_batches` live in the same SQLite file. One PC should understand a
+  scope; others get its lines through sync. Two PCs writing one scope at once is not supported
+  (there is no shared lock across PCs).
+- **A batch is fixed when handed out**: its turns' ids and hashes (refs t1..tN), the generation
+  it started from; turns shown in the order they happened, capped by count and characters.
+  Saving no lines marks the turns done.
+- **save is all or nothing**: lines checked first, then one `BEGIN IMMEDIATE` transaction writes
+  every memory and moves the progress. The model thinks outside it. Two agents from one point:
+  the first save wins, the other gets `STALE_BATCH`. The same batch saved again with the same
+  lines answers the first result (a lost reply); with other lines, a conflict.
+- **Understood facts are grouped apart** from facts the user saved (`attributes.fact` =
+  `understood:<state_key>`), so an inference never pushes a user's own fact into "before".
+- **Identity**: a server-issued `state_key` per line; a later version is a new memory with the
+  same key. History comes from versions (and from `replaced` on a new value line, written as
+  older versions), never from text inside the line. No `supersedes` link: recall drops
+  superseded memories, which would drop the history.
+- **Honest lines**: status fact | plan | uncertain; `date` is when it happened or became true
+  and null when not said (never the day it was mentioned); a date still ahead becomes
+  `planned_for`. The guide given with each batch says so.
+- **Forgetting**: erase takes every memory citing a forgotten turn in `attributes.from_turns`,
+  and `remember` refuses one that cites a forgotten turn, whichever way it arrives (a save, an
+  import from another PC, brain_remember). A turn forgotten between next and save: the lines
+  citing it are skipped.
+- **Packets**: a state line shows as `STATE` (confidence 0.7), never stands in for its turns (the
+  note rule that drops cited turns does not apply to it), and only value lines show earlier
+  values.
 
-Added: `attributes.kind` = value | event | item, and `memory_type = "state"` so they can be
-listed, counted and replaced as a layer. Content is one short line written for reading:
-`old sneakers: shoe rack in the closet (since 2023-05-29; before: under the bed, 2023-05-25)`.
-
-### Forgetting
-
-Forgetting a turn must take every memory derived from it. Today `erase` follows
-`semantic_ingestion_audit` (promoted copies) but not `attributes.from_turns`, so a note written
-from a turn the user deleted survives. Fixed first (it applies to existing notes too).
-
-### Updating: one tool, `brain_understand`
-
-- `next(scope?)`: up to N turns not yet folded in (oldest first, a cursor per scope), each with
-  a short ref (t1..tN), plus the current state lines for the subjects those turns touch. Text
-  is the stored (masked) text, `<private>` already gone.
-- `save(batch, lines)`: state lines citing refs; written as memories in one transaction
-  (values through about/attribute), and the cursor moves past the batch. A batch saved twice is
-  refused (the cursor already moved).
-
-Any attached agent can do it when asked; the worker runner gets a second role, `understand`
-(no git tree involved, same opt-in, grant per scope, daily cap). Nothing runs on its own.
-
-### Reading
-
-Unchanged paths: memories already go first in a packet (a quarter of the budget), the hook's
-stand-out rule applies to them, `brain_context` finds them by meaning and words. A state line
-is one short line, so several fit where one raw turn did.
-
-### Order of work
-
-1. forget follows `from_turns` (bug, independent)
-2. `brain_understand` next/save + cursor, tests
-3. compact line format, budget check on the pilot haystacks
-4. runner role `understand`
-5. the accuracy pilot (later; the user asked for features and speed first)
+Not yet: the runner role `understand`, ranking state against turns per question kind, stable
+attribute names across batches beyond showing existing lines, a measured accuracy effect.

@@ -158,11 +158,20 @@ def decide_recall(query, policy="auto"):
 
 def _memory_item(memory):
     content = memory["content"]
-    if memory.get("earlier"):          # a fact: its value now, then what it was before
-        content += "\n(current since " + memory["effective_at"][:10] + "; before: " + "; ".join(
-            f"{e['effective_at'][:10]} {e['content']}" for e in memory["earlier"]) + ")"
+    attributes = memory.get("attributes") or {}
+    state = memory.get("memory_type") == "STATE"
+    # a fact: its value now, then what it was before (an understood event or item is one thing,
+    # its earlier versions are only earlier wordings)
+    if memory.get("earlier") and (not state or attributes.get("kind") == "value"):
+        # a state line's day is the one it gives, or none: the day it was mentioned is not
+        # the day it became true
+        def day(item, attrs):
+            return (attrs.get("date") or "date unknown") if state else item["effective_at"][:10]
+        content += "\n(current since " + day(memory, attributes) + "; before: " + "; ".join(
+            f"{day(e, e.get('attributes') or {})} {e['content']}"
+            for e in memory["earlier"]) + ")"
     return {
-        "id": memory["memory_id"], "source_kind": "CURATED_MEMORY",
+        "id": memory["memory_id"], "source_kind": "STATE" if state else "CURATED_MEMORY",
         "memory_class": memory.get("memory_class", "EPISODE"),
         "modality": memory.get("modality", "OTHER"),
         "scope": memory["scope"], "title": memory["title"],
@@ -206,7 +215,9 @@ def build_context_pack(recall_result, *, max_chars=6000, order="relevance", shor
     memories = [_memory_item(item) for item in recall_result.get("matches", [])]
     # A note the model wrote after answering from old turns cites them: the note stands in for
     # those turns, and with a note in the packet fewer other turns are needed.
-    noted = {t for m in recall_result.get("matches", [])
+    # (not a state line: it says one thing from its turns, which can hold more - it never
+    # stands in for them)
+    noted = {t for m in recall_result.get("matches", []) if m.get("memory_type") != "STATE"
              if isinstance(refs := (m.get("attributes") or {}).get("from_turns"), list)
              for t in refs if isinstance(t, str)}
     turns = [_conversation_item(item)
