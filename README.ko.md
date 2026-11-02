@@ -64,7 +64,7 @@ Python이 없어도 되고, 따로 설정할 것도 없습니다. 설치 후 AI 
 /plugin install turnbook --marketplace goyohan0611-png/turnbook
 ```
 
-Codex: `codex plugin marketplace add goyohan0611-png/turnbook-plugin`, then `codex plugin add turnbook@turnbook`.
+코덱스는 `codex plugin marketplace add goyohan0611-png/turnbook-plugin` 다음에 `codex plugin add turnbook@turnbook`.
 
 <details>
 <summary>MCP 클라이언트에 직접 연결하기</summary>
