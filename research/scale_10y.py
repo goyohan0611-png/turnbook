@@ -152,7 +152,7 @@ def main() -> None:
                 batches += 1
                 print(f"  embedded {batches * 4096} in {time.perf_counter() - stored:.0f} s",
                       flush=True)
-                if batches % 10 == 0:               # keep progress if the job times out
+                if batches % 5 == 0:                # keep progress if the job times out
                     embedder.cache.flush()
             embedder.cache.flush()
             print(f"{5882 + added} turns: stored in {stored - began:.0f} s, embedded in "
