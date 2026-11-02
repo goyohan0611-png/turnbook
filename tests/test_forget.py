@@ -148,6 +148,33 @@ class PromotedCopyTests(unittest.TestCase):
             erase(index, {"turn_ids": find(index, "북쪽 계단")["turn_ids"]})
             self.assertEqual(find(index, "북쪽 계단"), {"turn_ids": [], "memory_ids": []})
 
+    def test_forgetting_a_turn_also_forgets_what_was_worked_out_from_it(self):
+        """A memory citing turns in attributes.from_turns (a note, a state line) holds what
+        they said: erasing the turns left it behind."""
+        from turnbook.forget import erase
+        from turnbook.local_brain import LocalBrainStore
+        with tempfile.TemporaryDirectory() as directory:
+            index = Path(directory) / "brain.sqlite"
+            with ConversationMemoryStore(index) as store:
+                store.record(turn(1, "금고 비밀번호는 고양이 이름에 생일을 붙인 거야"))
+                store.record(turn(2, "점심은 김밥"))
+            with LocalBrainStore(index) as brain:
+                for n, cites in ((1, ["t1"]), (2, ["t2"]), (3, [])):
+                    brain.remember({"memory_id": f"m{n}", "title": f"note {n}",
+                                    "content": f"note {n} from turns", "scope": "global",
+                                    "memory_type": "state",
+                                    "effective_at": "2026-11-01T00:00:00",
+                                    "known_at": "2026-11-01T00:00:00", "actor": "user",
+                                    "tags": [], "entities": [], "supersedes_memory_id": None,
+                                    "provenance": {"source_type": "test", "source_ref": "t"},
+                                    "attributes": {"from_turns": cites}})
+            erased = erase(index, {"turn_ids": ["t1"]})
+            self.assertEqual(erased["memory_ids"], ["m1"])
+            with LocalBrainStore(index) as brain:
+                left = {row[0] for row in brain.db.execute(
+                    "SELECT memory_id FROM local_brain_memories")}
+            self.assertEqual(left, {"m2", "m3"})
+
 
 class OutboxTests(unittest.TestCase):
     def test_a_promoted_memory_leaves_the_outbox_with_its_turn(self):

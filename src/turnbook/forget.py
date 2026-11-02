@@ -91,6 +91,14 @@ def _erase(db, ids):
         memories += [row[0] for row in db.execute(
             f"SELECT memory_id FROM semantic_ingestion_audit WHERE turn_id IN ({marks}) "
             "AND memory_id IS NOT NULL", turns) if row[0] not in memories]
+    if turns and "local_brain_memory_profiles" in tables:
+        # a memory worked out from these turns (a note after answering, a state line) names
+        # them in attributes.from_turns and holds what they said: it goes with them
+        marks = ",".join("?" * len(turns))
+        memories += [row[0] for row in db.execute(
+            "SELECT DISTINCT p.memory_id FROM local_brain_memory_profiles p, "
+            "json_each(p.attributes_json, '$.from_turns') j "
+            f"WHERE j.value IN ({marks})", turns) if row[0] not in memories]
     # what was forgotten stays forgotten: a later import of the same turn (another PC's
     # log, an outbox sent late, a transcript read again) is refused by the stores
     db.execute("CREATE TABLE IF NOT EXISTS forgotten_ids(id TEXT PRIMARY KEY)")
