@@ -6,7 +6,7 @@
   "homepage": "https://github.com/goyohan0611-png/turnbook",
   "repository": "https://github.com/goyohan0611-png/turnbook",
   "license": "Apache-2.0",
-  "icon": "./demo/logo.png",
+  "icon": "./icon.png",
   "keywords": ["memory", "mcp", "local", "long-term-memory"],
   "mcpServers": {
     "turnbook": {

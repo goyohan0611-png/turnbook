@@ -2,5 +2,5 @@
   "name": "turnbook",
   "owner": {"name": "Yohan Ko"},
   "description": "Turnbook: local memory for Claude Code",
-  "plugins": [{"name": "turnbook", "source": "./"}]
+  "plugins": [{"name": "turnbook", "source": "./plugins/turnbook"}]
 }
