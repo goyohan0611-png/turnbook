@@ -67,6 +67,32 @@ class OpenCodeTests(unittest.TestCase):
                     "SELECT content_redacted FROM conversation_turns ORDER BY rowid")]
         self.assertEqual(said, ["my password is [REDACTED]", "the session goes on"])
 
+    def test_the_hook_keeps_only_close_items_and_no_repeats(self):
+        """research/hook_floor.py: under the floor is noise; a past message that repeats this
+        one answers nothing; a turn found by its words (no similarity) stays."""
+        from unittest import mock
+        turns = [{"turn_id": "a", "role": "user", "content": "얼마나 걸려", "similarity": 0.66},
+                 {"turn_id": "b", "role": "assistant", "content": "about an hour",
+                  "similarity": 0.5},
+                 {"turn_id": "c", "role": "user", "content": "kiosk price list",
+                  "similarity": 0.3},
+                 {"turn_id": "d", "role": "user", "content": "found by words"}]
+        memories = [{"title": "close", "similarity": 0.4}, {"title": "far", "similarity": 0.2},
+                    {"title": "by words", "score": 140}]
+        seen = {}
+
+        def pack(recalled, **_):
+            seen.update(recalled)
+            return {"status": "KNOWN", "context": "x"}
+        with mock.patch("turnbook.mcp_server.gather", lambda *a, **k: {
+                "status": "KNOWN", "conversation_turns": list(turns), "matches": list(memories)}), \
+                mock.patch("turnbook.context_packet.build_context_pack", pack), \
+                mock.patch("turnbook.local_embedder.LOCAL_MODEL",
+                           "onnx-community/embeddinggemma-300m-ONNX@onnx/model_q4.onnx"):
+            self.assertTrue(context("얼마나 걸리나", database="db", embedder=object()))
+        self.assertEqual([t["turn_id"] for t in seen["conversation_turns"]], ["b", "d"])
+        self.assertEqual([m["title"] for m in seen["matches"]], ["close", "by words"])
+
     def test_a_message_with_no_sign_of_the_past_gets_nothing(self):
         self.assertEqual(context("write a quicksort in rust"), "")
         self.assertEqual(context("   "), "")

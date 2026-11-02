@@ -382,7 +382,8 @@ class LocalBrainStore:
                 floor = FLOORS.get(LOCAL_MODEL, MEANING_FLOOR)
                 close = sorted(((score, i) for i, score in enumerate(similar)
                                 if score is not None and score >= floor), reverse=True)
-                selected = [everything[i] for score, i in close
+                # the similarity goes along: the per-message hook holds it to a higher floor
+                selected = [{**everything[i], "similarity": score} for score, i in close
                             if score >= close[0][0] - MEANING_MARGIN][:limit]
         if not selected:
             return {"status": "UNKNOWN", "reason": "NO_MATCHING_MEMORY",

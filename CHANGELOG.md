@@ -11,6 +11,12 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
   Reads, searches and tool output are still left out. Kept once the transcript has been quiet
   for two minutes, so a long run is one line, not one per scan (on this PC: 8,499 tool calls,
   3,247 lines, next to 6,163 replies).
+- **Less unrelated memory on each message.** The hook added the 4 nearest items to every
+  message, related or not. It now keeps only those at least 0.36 similar (EmbeddingGemma; a
+  turn found by its words is kept) and drops past messages that repeat this one ("얼마나 걸려"
+  for "얼마나 걸리나"). Measured on LongMemEval_S 500 (`research/hook_floor.py`): the answer
+  is in 74.8% of packets (78.8% before), and asked of someone else's history, 65.8% of
+  packets are now empty (0% before). `brain_context` is unchanged.
 - **Claude Code plugin.** `/plugin install turnbook --marketplace goyohan0611-png/turnbook`
   runs the memory server and the message hook through `uvx` (new command `turnbook-hook`).
   With `turnbook-install` too, the plugin's hook stays quiet so the memory is added once.
