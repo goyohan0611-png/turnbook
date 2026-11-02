@@ -4,6 +4,16 @@ Upgrade: `python -m pip install --upgrade turnbook`, then `turnbook-install`.
 Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 
 ## Unreleased
+- **Everything is called Turnbook now.** The Python package is `turnbook` (`graph_mind` stays as
+  an alias, so apps, hooks and Startup entries written before keep working until
+  `turnbook-install` rewrites them); settings are `TURNBOOK_*` (`GRAPH_MIND_*` still read); the
+  memory server apps show is `turnbook` (was `graph-mind-memory`); the Startup shortcut is
+  `Turnbook.lnk` (macOS: `com.turnbook.capture`); OpenCode's files are `turnbook.md` and
+  `plugins/turnbook.js`. The installer replaces each old entry instead of adding beside it.
+- **The memory folder is `~/.turnbook`.** An existing `~/.graph-mind` is moved, with the paths
+  written inside it, when nothing holds a file in it: by `turnbook-install` (it stops the
+  capture service and this PC's hub first) or at the next login, when the capture service
+  starts before the apps. Until then it is used where it is.
 - **Development notes from before 0.8 are no longer answered as memories.** The feature that
   wrote them went in 0.8, but search still read its table, so an agent's task summaries from
   then took the curated-memory slots of hook packets. The notes stay in the file, unread.
