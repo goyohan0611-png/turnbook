@@ -3,7 +3,11 @@
 Upgrade: `python -m pip install --upgrade turnbook`, then `turnbook-install`.
 Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 
-## Unreleased
+## 1.0.0 — 2026-11-02
+Turnbook 1.0: the name everywhere, the memory in `~/.turnbook`, and the fixes of the review
+that led up to it (0.10.5). Upgrading: `pip install -U turnbook && turnbook-install`, then
+restart your AI apps.
+
 - **Everything is called Turnbook now.** The Python package is `turnbook` (`graph_mind` stays as
   an alias, so apps, hooks and Startup entries written before keep working until
   `turnbook-install` rewrites them); settings are `TURNBOOK_*` (`GRAPH_MIND_*` still read); the
@@ -20,6 +24,8 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
   with a `<tag>` after the known blocks are taken out is stored as before and counted per tag
   (`unknown_blocks` in the status), so the next thing an app starts putting into its "user"
   messages is seen the first day. Tests now use transcripts shaped like the real ones.
+- The README shows this version's results only; the memory-growth chart is redrawn with
+  EmbeddingGemma (to 55,882 turns; larger sizes are being measured).
 - `.github/smoke_install.py` run by hand uses a temp folder, never the real memory.
 - **Development notes from before 0.8 are no longer answered as memories.** The feature that
   wrote them went in 0.8, but search still read its table, so an agent's task summaries from

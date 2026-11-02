@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "turnbook"
-version = "0.10.5"
+version = "1.0.0"
 description = "Local long-term memory for AI agents: every conversation word for word, on your own PC, shared by all your agents, nothing spent to save."
 readme = "README.md"
 requires-python = ">=3.10"

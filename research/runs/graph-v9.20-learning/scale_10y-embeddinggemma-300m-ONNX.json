@@ -1,0 +1,7 @@
+{
+ "note": "research/scale_10y.py --shipped on CI run 41020670412 (EmbeddingGemma, LoCoMo 1,536 questions inside a memory grown with LongMemEval_S sessions). The 155,885 and 405,885 sizes did not finish within the CI limit; this file holds the two sizes it measured, copied from that run's log.",
+ "5882/fusion (0.9.45)": {"hit@5": 0.627, "hit@10": 0.742, "hit@30": 0.902, "ms_median": 27, "ms_p95": 38},
+ "5882/shipped": {"hit@5": 0.709, "hit@10": 0.814, "hit@30": 0.926, "ms_median": 30, "ms_p95": 39},
+ "55882/fusion (0.9.45)": {"hit@5": 0.638, "hit@10": 0.744, "hit@30": 0.884, "ms_median": 113, "ms_p95": 171},
+ "55882/shipped": {"hit@5": 0.71, "hit@10": 0.819, "hit@30": 0.927, "ms_median": 116, "ms_p95": 174}
+}

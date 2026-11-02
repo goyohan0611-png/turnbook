@@ -7,12 +7,12 @@
     "url": "https://github.com/goyohan0611-png/turnbook",
     "source": "github"
   },
-  "version": "0.10.5",
+  "version": "1.0.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "turnbook",
-      "version": "0.10.5",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
       }

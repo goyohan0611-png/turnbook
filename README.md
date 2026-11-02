@@ -7,7 +7,7 @@
 
 ### Your AI forgets everything when the session ends. This one remembers, and it never calls an LLM to do it.
 
-**No AI summaries: every conversation is kept word for word, so nothing is lost or made up on the way in, and saving costs zero model tokens. 91.8% on LongMemEval from 3.1k tokens of memory per question ([0.10.0](#does-it-work)). Runs on your own PC.**
+**No AI summaries: every conversation is kept word for word, so nothing is lost or made up on the way in, and saving costs zero model tokens. 91.8% on LongMemEval from 3.1k tokens of memory per question ([details](#does-it-work)). Runs on your own PC.**
 
 [![][license-shield]][license-link]
 [![][python-shield]][python-link]
@@ -111,8 +111,8 @@ that answer the question.
 - **Made for orchestration.** When an orchestrator runs several agents at once, they all write
   to the same memory as they work, so what one agent decided is there for the next. Every
   memory keeps which app and session it came from.
-- **Holds up as memory piles up.** With 0.9.47's search model, in a memory of 205,000 turns the
-  answer is still among the first 30 found for 79.7% of questions (82.8% at 6,000), and a search takes about 0.4 s.
+- **Holds up as memory piles up.** Grow a memory tenfold and the answer is still among the first
+  30 found for 92.7% of questions (92.6% before); a search takes about 0.1 s.
   [As the memory grows](#as-the-memory-grows)
 - **Any language, across languages.** The search model reads Korean almost as well as English:
   ask in Korean about something said in English, or the other way round. [In Korean](#in-korean)
@@ -191,14 +191,14 @@ memory; a Python API and multi-user server mode are not built yet. Interested? O
 ## Does it work?
 
 [LongMemEval](https://github.com/xiaowu0162/LongMemEval) is the public benchmark for long-term
-chat memory: 500 questions over about 50 past sessions each. Every Turnbook score here uses the
-same answer model (gpt-5-mini), the same prompt and the official gpt-4o judge, and a question the
-answer model leaves unanswered counts as wrong.
+chat memory: 500 questions over about 50 past sessions each. Turnbook's scores use gpt-5-mini as
+the answer model with the benchmark's own prompt and official gpt-4o judge; a question left
+unanswered counts as wrong.
 
-| | accuracy | model tokens spent **saving** memory | text the answer model reads |
-|---|---|---|---|
-| **Turnbook 0.10.0** | **91.8%** (all 500) | **0** | **3.1k tokens** |
-| Turnbook 0.9.9 | 88.8% (all 500) | 0 | 3.4k tokens |
+| text the answer model reads (median) | accuracy | model tokens spent **saving** memory |
+|---|---|---|
+| **3.1k tokens** (the default) | **91.8%** (459/500) | **0** |
+| 25k tokens | 93.0% (465/500) | 0 |
 
 ### How it compares
 
@@ -212,36 +212,12 @@ where Turnbook loses points: 33 of its 41 misses are questions that combine seve
 reason about dates, or need the newest value of something that changed. Turnbook keeps the
 original words, spends no model tokens saving them, and runs on your own PC.
 
-On one rival we measured ourselves, with the same reader and judge:
-[rohitg00/agentmemory](https://github.com/rohitg00/agentmemory)'s published retrieval gave 80.4%
-(Turnbook 0.9.9: 89.0% on the same 499); [details](docs/benchmarks.md).
+### What makes the difference
 
-### Fewer tokens for the same accuracy
-
-0.10.0 changes the search model for new installs from mpnet to EmbeddingGemma. The same 500
-questions, the same reader and judge; only the search model and the packet size differ:
-
-| search model | text the answer model reads (median) | accuracy |
-|---|---|---|
-| mpnet | 3.4k tokens | 86.6% |
-| mpnet | 6.7k tokens | 89.6% |
-| mpnet | 13.2k tokens | 90.4% |
-| mpnet | 26.3k tokens | 91.8% |
-| **EmbeddingGemma** | **3.1k tokens** | **91.8%** |
-| EmbeddingGemma | 25k tokens | 93.0% |
-
-Against mpnet at the same size, EmbeddingGemma answers 33 questions mpnet misses and misses 7 it
-answers (p = 0.00004). Questions that need several past sessions gain most: 73.6% → 88.4%. The
-re-ranker weights for each model were trained on LoCoMo and LongMemEval together. These packets
-held up to 15,000 characters; since 0.10.0 `brain_context` sends up to 30,000 by default
-(`max_chars` sets it). Its retrieval on LoCoMo, scored on conversations its weights never saw
-(answer turn among the first 10 found): 83.7%, mpnet 70.2%.
-[research/runs/graph-v9.14-full500-mpnet8-gemma](research/runs/graph-v9.14-full500-mpnet8-gemma)
-
-**Without the learned re-ranker** (plain rank fusion, no weight fitted on any benchmark): 87.0% of
-all 500, 86.8% of the 380 questions never used for tuning, where the shipped search scores 91.1%
-(19 questions only it answers, 3 only fusion). The re-ranker helps most where answers are spread
-over several sessions. [norerank](research/runs/graph-v9.14-full500-mpnet8-norerank)
+**The learned re-ranker.** Without it (plain rank fusion, no weight fitted on any benchmark):
+87.0% of all 500, and 86.8% of the 380 questions never used for tuning, where the shipped search
+scores 91.1%. It helps most where answers are spread over several sessions.
+[norerank](research/runs/graph-v9.14-full500-mpnet8-norerank)
 
 **The memory added to each message** (4 items, ~300 tokens) is a hint, not the full search: alone
 it answers 61.4% of the same 500; `brain_context`, which the model calls for more, answers 91.8%.
@@ -252,40 +228,21 @@ person's memory attached, gpt-5-mini solved 191, against 193 without it (p = 0.6
 
 ### As the memory grows
 
-The charts below were measured with 0.9.47 and its search model (mpnet). With 0.10's model, at
-6,000 turns the answer turn is among the first 30 found for 92.5% of questions (0.9.47: 82.8%);
-the larger memories are still being measured.
+More past conversations means more that looks like the one you mean. On LoCoMo (1,536 questions),
+with each person's memory grown tenfold by storing other people's conversations beside it, the
+answer turn stays among the first 30 found for 92.7% of questions (92.6% before it grew); plain
+rank fusion drops from 90.2% to 88.4%. A search takes 30 ms at 5,882 turns and 116 ms at 55,882.
+Larger memories are being measured.
+[scale](research/runs/graph-v9.20-learning/scale_10y-embeddinggemma-300m-ONNX.json)
 
-Recall gets harder as memory piles up: more past conversations look like the one you mean. Since 0.9.46
-Turnbook orders what it finds with a small learned score instead of a fixed blend. On LoCoMo (1,536
-questions), with each person's memory grown to 10× by storing other conversations beside it, the
-share of questions whose answer reaches the model fell 5.6 points before (82.5% → 76.9%) and 3.1
-points now (83.5% → 80.4%). Each conversation was scored with weights learned on the other nine;
-the added conversations are other people's, likely easier to tell apart than one person's own
-history. On LongMemEval the same change took the answer reaching the model from 97.5% to 98.3%.
-
-0.9.47 adds more to that score (how rare the shared words are, how much of one past conversation was
-found) and looks at 100 candidates per search instead of 50. With LoCoMo inside a memory grown to
-205,000 turns, the answer turn is among the first 30 found for 79.7%
-of questions, against 73.0% with the fixed blend of 0.9.45; a search takes about 0.4 s there.
-
-<p align="center"><img src="https://raw.githubusercontent.com/goyohan0611-png/turnbook/main/demo/scale-large.png" alt="Answer turn among the first 30 from 6k to 205k turns: 82.8 to 79.7 percent with 0.9.47, 76.8 to 73.0 percent with plain rank fusion" width="720"></p>
-
-<p align="center"><img src="https://raw.githubusercontent.com/goyohan0611-png/turnbook/main/demo/scale.png" alt="Recall at 1x, 4x and 10x memory: 83.5 to 80.4 percent with learned re-ranking, 82.5 to 76.9 percent before" width="720"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/goyohan0611-png/turnbook/main/demo/scale.png" alt="Answer turn among the first 30 found: 92.6 percent at 5,882 turns, 92.7 percent at 55,882; plain rank fusion 90.2 to 88.4 percent" width="720"></p>
 
 ### In Korean
 
 Four LoCoMo conversations translated into Korean (582 questions). Search by meaning alone, share
-of questions whose answer turn is among the first 30 found:
-
-| search model | English | Korean | Korean question, English memory |
-|---|---|---|---|
-| mpnet | 75.6% | 67.5% | 70.6% |
-| **EmbeddingGemma** (0.10.0 default) | **90.2%** | **86.9%** | **87.8%** |
-
-With all of search (words, meaning, re-ranker) on mpnet, 0.9.47 found the answer turn among the
-first 30 for 77.5% of Korean questions (84.7% in English); word search finds "콩이" in "콩이를"
-(Korean particles). [research/runs/graph-v9.21-korean](research/runs/graph-v9.21-korean)
+of questions whose answer turn is among the first 30 found: English 90.2%, Korean 86.9%, a Korean
+question about an English memory 87.8%. Word search finds "콩이" in "콩이를" (Korean particles).
+[research/runs/graph-v9.21-korean](research/runs/graph-v9.21-korean)
 
 Every question, answer and verdict is in [`research/runs/`](research/runs); method, failures and
 how to rerun it: [docs/benchmarks.md](docs/benchmarks.md).
@@ -293,17 +250,16 @@ how to rerun it: [docs/benchmarks.md](docs/benchmarks.md).
 ## FAQ
 
 **Will it slow my PC down?** The background service uses about 2% of one CPU core when nothing new
-is coming in. An app's memory server holds about 525 MB with EmbeddingGemma (772 MB with mpnet).
-A memory search takes about 40 ms (46 ms at the 95th percentile on a GitHub runner; mpnet 26 ms);
+is coming in. An app's memory server holds about 525 MB. A memory search takes about 40 ms
+(46 ms at the 95th percentile on a GitHub runner);
 the first one after an app starts, about 1.4 s. Each new turn takes about 0.1 s to embed; the
 service runs below normal CPU priority and embeds backlogs at half pace. On a first install, the
 conversations already on the PC are read in the background while word search answers at once.
 
 **Which search model?** [EmbeddingGemma](https://huggingface.co/google/embeddinggemma-300m)
-(about 200 MB, downloaded from Hugging Face on first use). A memory from 0.9.47 or before keeps
-searching with its old model (mpnet) while the background service reads it again with
-EmbeddingGemma, a few pieces at a time when nothing else is due; then it moves over by itself
-and the old model is deleted. `turnbook model` shows which model is in use; `turnbook model
+(about 200 MB, downloaded from Hugging Face on first use). A memory from an older version is
+read again with it in the background and moves over by itself. `turnbook model` shows which
+model is in use; `turnbook model
 REPO@FILE` switches to any ONNX embedding model on Hugging Face (memory is read again with it in
 the background). A model you picked is never deleted.
 EmbeddingGemma is provided under the
