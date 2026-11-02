@@ -143,3 +143,27 @@ too long to put 30 in a 1,200-character hook packet. So: compact lines, and few 
 
 Not yet: the runner role `understand`, ranking state against turns per question kind, stable
 attribute names across batches beyond showing existing lines, a measured accuracy effect.
+
+### First real runs (2026-11-03)
+
+Codex 0.160 (gpt-6.1-sol, medium) kept one LongMemEval_S history (07741c45: "Where do I
+currently keep my old sneakers?", never shown to it) through `brain_understand` alone
+(`research/understand_e2e.py`):
+
+| run | time | batches | lines | median line | notes |
+|---|---|---|---|---|---|
+| guide 1 | 165 s | 17 | 108 | 85 chars | many `user:` heads; "last Saturday" left undated |
+| guide 2 | 168 s | 17 | 116 | 79 chars | subjects name things; "last Saturday" -> 2023-05-27 |
+
+About 170k tokens of the user's Codex subscription per 527 turns.
+
+Per-message hook on the rebuilt store (527 turns + 108 lines, `research/understand_packets.py`):
+0.12-0.21 s a message; the question got 1 state line and its turns, four unrelated messages got
+no state line (three got nothing at all). Indexing the 527 turns' vectors at low priority took
+7.7 min, the capture service's usual cost.
+
+Known limit: a change filed under another subject stays a separate line ("storage: under my bed"
+and "organization: store old sneakers in shoe rack (plan)"); the guide asking to update the same
+line did not fix it. Both lines carry the day they were said, and the turns come with them, so
+the reader can tell which is newer; ranking state against turns per question kind and grouping
+by subject are next.
