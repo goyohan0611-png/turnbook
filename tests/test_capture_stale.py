@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timedelta
 
-from graph_mind import automatic_capture, mcp_server
+from turnbook import automatic_capture, mcp_server
 
 
 def test_stopped_capture_is_reported(tmp_path, monkeypatch):

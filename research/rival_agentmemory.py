@@ -64,7 +64,7 @@ def mcnemar(a: dict, b: dict) -> dict:
     only_b = sum(b[q] and not a[q] for q in both)
     n, k = only_a + only_b, min(only_a, only_b)
     p = min(1.0, 2 * sum(comb(n, i) for i in range(k + 1)) / 2 ** n) if n else 1.0
-    return {"questions": len(both), "only_graph_mind": only_a, "only_agentmemory": only_b,
+    return {"questions": len(both), "only_turnbook": only_a, "only_agentmemory": only_b,
             "p": float(f"{p:.2e}")}
 
 
@@ -112,9 +112,9 @@ def main():
     untuned = both - tuned
     result = {
         "agentmemory": f"{sum(theirs[q] for q in both)}/{len(both)}",
-        "graph_mind": f"{sum(ours[q] for q in both)}/{len(both)}",
+        "turnbook": f"{sum(ours[q] for q in both)}/{len(both)}",
         "untuned": {"agentmemory": f"{sum(theirs[q] for q in untuned)}/{len(untuned)}",
-                    "graph_mind": f"{sum(ours[q] for q in untuned)}/{len(untuned)}"},
+                    "turnbook": f"{sum(ours[q] for q in untuned)}/{len(untuned)}"},
         "mcnemar": mcnemar({q: ours[q] for q in both}, {q: theirs[q] for q in both}),
         "packet_chars_median": chars[len(chars) // 2], "by_type": report["by_type"]}
     (out / "comparison.json").write_text(json.dumps(result, indent=1), encoding="utf-8")

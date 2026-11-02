@@ -8,17 +8,17 @@ import os
 import sys
 import tempfile
 
-import episode_eval  # noqa: F401  (first: isolates GRAPH_MIND_HOME, sets up the paths)
+import episode_eval  # noqa: F401  (first: isolates TURNBOOK_HOME, sets up the paths)
 
 from evidence import CACHE, DATA, fill  # noqa: E402
 from longmemeval_m_fetch import stream_instances  # noqa: E402
 
 import numpy as np  # noqa: E402
 
-from graph_mind.conversation_memory import ConversationMemoryStore  # noqa: E402
-from graph_mind.packing import unpack  # noqa: E402
-from graph_mind.local_embedder import LocalEmbedder  # noqa: E402
-from graph_mind.warmup import turn_pieces  # noqa: E402
+from turnbook.conversation_memory import ConversationMemoryStore  # noqa: E402
+from turnbook.packing import unpack  # noqa: E402
+from turnbook.local_embedder import LocalEmbedder  # noqa: E402
+from turnbook.warmup import turn_pieces  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 cached = LocalEmbedder(CACHE / "embed-cache.json")

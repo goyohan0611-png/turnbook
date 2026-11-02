@@ -4,7 +4,7 @@
     2. a new session asks about it: does the model look it up, and answer right?
 
 OpenCode connects the memory server; the model only sees the tools and the instructions file the
-installer writes. Every run uses a throwaway memory (GRAPH_MIND_HOME) and a throwaway OpenCode
+installer writes. Every run uses a throwaway memory (TURNBOOK_HOME) and a throwaway OpenCode
 config (XDG_CONFIG_HOME), so neither the user's memory nor their OpenCode settings are touched.
 Signed-in providers and their models are the user's own (OpenCode's free models cost nothing).
 
@@ -31,9 +31,9 @@ OPENCODE = shutil.which("opencode.cmd") or shutil.which("opencode")   # npm on W
 
 
 def session(model, prompt, home, config, work):
-    env = {**os.environ, "GRAPH_MIND_HOME": str(home), "XDG_CONFIG_HOME": str(config),
+    env = {**os.environ, "TURNBOOK_HOME": str(home), "XDG_CONFIG_HOME": str(config),
            "PYTHONUTF8": "1"}
-    env.pop("GRAPH_MIND_DB", None)
+    env.pop("TURNBOOK_DB", None)
     run = subprocess.run([OPENCODE, "run", "-m", model, "--format", "json", "--dir", str(work),
                           prompt], env=env, capture_output=True, text=True, encoding="utf-8",
                          errors="replace", timeout=600)
@@ -57,7 +57,7 @@ def session(model, prompt, home, config, work):
 
 def capture(home):
     """What the capture service does on its next pass: the plugin's transcript into the store."""
-    from graph_mind.conversation_memory import ConversationMemoryStore, OpenCodeConversationCapture
+    from turnbook.conversation_memory import ConversationMemoryStore, OpenCodeConversationCapture
     root = home / "opencode"
     if not root.is_dir():
         return 0
@@ -74,8 +74,8 @@ def check(model):
     for path in (home, config, work):
         path.mkdir(parents=True)
     # what graph-mind-install writes (server, instructions, plugin), into the throwaway config
-    os.environ.update(XDG_CONFIG_HOME=str(config.parent), GRAPH_MIND_HOME=str(home))
-    from graph_mind import install
+    os.environ.update(XDG_CONFIG_HOME=str(config.parent), TURNBOOK_HOME=str(home))
+    from turnbook import install
     install.opencode(home)
     if not PLUGIN:
         (config / "plugins" / "graph-mind.js").unlink()

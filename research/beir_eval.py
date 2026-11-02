@@ -30,10 +30,10 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
-from graph_mind.conversation_memory import ConversationMemoryStore  # noqa: E402
-from graph_mind.local_embedder import LOCAL_MODEL, LocalEmbedder  # noqa: E402
-from graph_mind.mcp_server import _PIECES, excerpt, fuse, rerank, semantic_turns  # noqa: E402
-from graph_mind.warmup import warm_turns  # noqa: E402
+from turnbook.conversation_memory import ConversationMemoryStore  # noqa: E402
+from turnbook.local_embedder import LOCAL_MODEL, LocalEmbedder  # noqa: E402
+from turnbook.mcp_server import _PIECES, excerpt, fuse, rerank, semantic_turns  # noqa: E402
+from turnbook.warmup import warm_turns  # noqa: E402
 
 DATA = ROOT / "bench/.cache/beir"
 CACHE = ROOT / "bench/.cache"

@@ -1,12 +1,12 @@
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import json
 import tempfile
 import unittest
 
-from graph_mind.automatic_capture import AutomaticCaptureService, make_config
-from graph_mind.coding_memory import CodingMemoryStore
-from graph_mind.conversation_memory import ConversationMemoryStore
+from turnbook.automatic_capture import AutomaticCaptureService, make_config
+from turnbook.coding_memory import CodingMemoryStore
+from turnbook.conversation_memory import ConversationMemoryStore
 
 
 class AutomaticCaptureTests(unittest.TestCase):
@@ -81,7 +81,7 @@ class AutomaticCaptureTests(unittest.TestCase):
         does, so the always-running service has to."""
         import os
         from unittest import mock
-        from graph_mind import sharing
+        from turnbook import sharing
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             shared, sessions, state = root / "shared", root / "sessions", root / "state"
@@ -90,14 +90,14 @@ class AutomaticCaptureTests(unittest.TestCase):
                 session_id="capture:test", sessions_root=sessions,
                 db_path=root / "brain.sqlite", poll_seconds=1)
             config["code_workspaces"], config["memory_folder"] = [], str(shared)
-            with mock.patch.dict(os.environ, {"GRAPH_MIND_DEVICE": "laptop"}):
+            with mock.patch.dict(os.environ, {"TURNBOOK_DEVICE": "laptop"}):
                 sharing.append(shared, "turn", {
                     "turn_id": "t1", "client": "codex", "client_session_id": "s",
                     "scope": "global", "role": "user", "content_redacted": "lunch was a panini",
                     "raw_sha256": "t1", "source_path": "p", "source_ordinal": 1,
                     "happened_at": "2026-10-30T12:00:00", "known_at": "2026-10-30T12:00:00",
                     "redaction_count": 0, "cwd": None})
-            with mock.patch.dict(os.environ, {"GRAPH_MIND_DEVICE": "desk"}):
+            with mock.patch.dict(os.environ, {"TURNBOOK_DEVICE": "desk"}):
                 AutomaticCaptureService(config, state_dir=state).pull_shared()
             with ConversationMemoryStore(root / "brain.sqlite") as store:
                 found = store.search("panini")["turns"]
@@ -167,7 +167,7 @@ class AutomaticCaptureTests(unittest.TestCase):
                 "codex": {"recorded_turns": next(new)}}}
             embedded = iter([512, 3, 1])                  # a full batch, the rest, the new two
             service.embed_new_turns = mock.Mock(side_effect=lambda: next(embedded))
-            with mock.patch("graph_mind.automatic_capture.time.sleep"):
+            with mock.patch("turnbook.automatic_capture.time.sleep"):
                 service.run_forever(max_iterations=7)
             self.assertEqual(service.embed_new_turns.call_count, 3)
 

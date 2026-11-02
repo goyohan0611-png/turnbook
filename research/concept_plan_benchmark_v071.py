@@ -8,8 +8,8 @@ from time import perf_counter
 import json
 import os
 
-from graph_mind.associative_memory import AssociativeMemoryIndex
-from graph_mind.paths import default_development_db
+from turnbook.associative_memory import AssociativeMemoryIndex
+from turnbook.paths import default_development_db
 from llm_concept_planner import (
     DEFAULT_MODEL, INSTRUCTIONS, MINIMUM_CONCEPT_COVERAGE, PLAN_SCHEMA,
     OpenAIResponsesConceptPlanner, digest,

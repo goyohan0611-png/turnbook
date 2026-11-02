@@ -1,6 +1,6 @@
 """Project brains on a team hub: a teammate sees only the projects given to them, can never read
 the owner's personal memory, acts within their role, and loses access when removed."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 from unittest import mock
 import os
@@ -9,22 +9,22 @@ import tempfile
 import time
 import unittest
 
-from graph_mind import sharing
-from graph_mind import project_brains as pl
+from turnbook import sharing
+from turnbook import project_brains as pl
 
 
 class FolderTests(unittest.TestCase):
     def test_a_bound_folder_names_the_default_project(self):
         root = Path(tempfile.mkdtemp())
         (root / "src" / "deep").mkdir(parents=True)
-        with mock.patch.dict(os.environ, {"GRAPH_MIND_CONFIG": str(root / "config.json")}):
+        with mock.patch.dict(os.environ, {"TURNBOOK_CONFIG": str(root / "config.json")}):
             pl.bind_folder(root, "graph-mind")
             self.assertEqual(pl.folder_project(root / "src" / "deep"), "graph-mind")
             self.assertIsNone(pl.folder_project(Path(tempfile.mkdtemp())))
 
     def test_without_team_hubs_only_the_own_ledger_is_used(self):
         root = Path(tempfile.mkdtemp())
-        with mock.patch.dict(os.environ, {"GRAPH_MIND_CONFIG": str(root / "config.json")}):
+        with mock.patch.dict(os.environ, {"TURNBOOK_CONFIG": str(root / "config.json")}):
             found, unreachable = pl.ledgers()
             self.assertEqual((len(found), unreachable), (1, []))
             found[0].create_project("solo", "me")
@@ -40,7 +40,7 @@ class FolderTests(unittest.TestCase):
         code = lambda host: pl.TEAM_PREFIX + base64.urlsafe_b64encode(json.dumps(  # noqa: E731
             {"h": [host], "p": 1, "u": "u", "k": "k", "l": "", "n": "n"}).encode()).decode()
         root = Path(tempfile.mkdtemp())
-        with mock.patch.dict(os.environ, {"GRAPH_MIND_CONFIG": str(root / "config.json")}):
+        with mock.patch.dict(os.environ, {"TURNBOOK_CONFIG": str(root / "config.json")}):
             sharing._save({"team_hubs": [code("10.0.0.1"), code("10.0.0.2")]})
             with self.assertRaisesRegex(ValueError, "HUB_REQUIRED.*10.0.0.1.*10.0.0.2"):
                 pl.home_ledger()
@@ -65,7 +65,7 @@ class HubInputTests(unittest.TestCase):
 
     def test_a_key_in_a_reference_or_a_link_is_not_shared(self):
         root = Path(tempfile.mkdtemp())
-        with mock.patch.dict(os.environ, {"GRAPH_MIND_CONFIG": str(root / "config.json")}):
+        with mock.patch.dict(os.environ, {"TURNBOOK_CONFIG": str(root / "config.json")}):
             ledger = pl.ledgers()[0][0]
             ledger.create_project("solo", "me")
             key = "sk-" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6"
@@ -109,16 +109,16 @@ class TeamHubTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(tempfile.gettempdir()) / f"graph-mind-team-{os.getpid()}-{time.time_ns()}"
         self.root.mkdir()
-        self.saved = (sharing.PORT, os.environ.get("GRAPH_MIND_HOME"),
-                      os.environ.get("GRAPH_MIND_CONFIG"))
+        self.saved = (sharing.PORT, os.environ.get("TURNBOOK_HOME"),
+                      os.environ.get("TURNBOOK_CONFIG"))
         # a free port per test, never the real hub's: on Windows the previous test's server was
         # sometimes still shutting down on a shared port, and dropped the next test's connection
         with socket.socket() as probe:
             probe.bind(("127.0.0.1", 0))
             sharing.PORT = probe.getsockname()[1]
         sharing._LOCAL_URI.clear()
-        os.environ["GRAPH_MIND_HOME"] = str(self.root / "home")
-        os.environ["GRAPH_MIND_CONFIG"] = str(self.root / "owner-config.json")
+        os.environ["TURNBOOK_HOME"] = str(self.root / "home")
+        os.environ["TURNBOOK_CONFIG"] = str(self.root / "owner-config.json")
         sharing._save({"memory_folder": "local", "user_name": "yohan"})
 
     def tearDown(self):
@@ -128,8 +128,8 @@ class TeamHubTests(unittest.TestCase):
             pass
         sharing.PORT = self.saved[0]
         sharing._LOCAL_URI.clear()
-        for name, value in (("GRAPH_MIND_HOME", self.saved[1]),
-                            ("GRAPH_MIND_CONFIG", self.saved[2])):
+        for name, value in (("TURNBOOK_HOME", self.saved[1]),
+                            ("TURNBOOK_CONFIG", self.saved[2])):
             if value is None:
                 os.environ.pop(name, None)
             else:
@@ -258,7 +258,7 @@ class TeamHubTests(unittest.TestCase):
         code and asks where things stand. Everything through brain_checkpoint."""
         import asyncio
         from mcp import Client
-        from graph_mind.mcp_server import build_server
+        from turnbook.mcp_server import build_server
 
         async def run():
             async with Client(build_server(self.root / "a.sqlite")) as a:
@@ -287,7 +287,7 @@ class TeamHubTests(unittest.TestCase):
                                        instructions="커밋 전에 테스트")).structured_content
                 self.assertEqual(proposed["command"], 'turnbook team instructions "graph-mind"')
                 self.assertEqual(pl.ledger_for("graph-mind").instructions("graph-mind"), "")
-                from graph_mind import mcp_server
+                from turnbook import mcp_server
                 with mock.patch.object(mcp_server, "configured_db_path",
                                        return_value=self.root / "a.sqlite"), \
                         mock.patch("builtins.input", return_value="n"):
@@ -304,7 +304,7 @@ class TeamHubTests(unittest.TestCase):
                 refused = (await call(action="remove_member", member="minji")).structured_content
                 self.assertEqual(refused["status"], "REFUSED")    # never the whole account
                 self.assertTrue(pl.accounts())
-            os.environ["GRAPH_MIND_CONFIG"] = str(self.root / "minji-config.json")
+            os.environ["TURNBOOK_CONFIG"] = str(self.root / "minji-config.json")
             async with Client(build_server(self.root / "b.sqlite")) as b:
                 call = lambda **k: b.call_tool("brain_checkpoint", k)  # noqa: E731
                 joined = (await call(action="join_team", code=code, name="minji")
@@ -329,17 +329,17 @@ class TeamHubTests(unittest.TestCase):
         with mock.patch.object(sharing, "_firewall", return_value="open"):
             minji = pl.invite("mini", "editor", ["alpha"], "yohan")["team_code"]
             jun = pl.add_account("jun")["team_code"]
-        owner_config = os.environ["GRAPH_MIND_CONFIG"]
+        owner_config = os.environ["TURNBOOK_CONFIG"]
 
-        os.environ["GRAPH_MIND_CONFIG"] = str(self.root / "minji.json")
+        os.environ["TURNBOOK_CONFIG"] = str(self.root / "minji.json")
         self.assertEqual(pl.join_team(minji, "김민지")["joined_as"], "김민지")
         self.assertEqual(sharing._config()["user_name"], "김민지")
-        os.environ["GRAPH_MIND_CONFIG"] = str(self.root / "jun.json")
+        os.environ["TURNBOOK_CONFIG"] = str(self.root / "jun.json")
         with self.assertRaisesRegex(ValueError, "NAME_TAKEN"):
             pl.join_team(jun, "김민지")
         self.assertEqual(sharing._config().get("team_hubs", []), [])   # not half joined
 
-        os.environ["GRAPH_MIND_CONFIG"] = owner_config
+        os.environ["TURNBOOK_CONFIG"] = owner_config
         with self.assertRaisesRegex(ValueError, "NAME_TAKEN"):
             pl.add_account("김민지")             # a second 김민지 would make "add 김민지" a guess
         with pl._admin() as hub:                # a hub from before names were unique

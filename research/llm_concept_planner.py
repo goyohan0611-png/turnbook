@@ -115,7 +115,7 @@ class OpenAIResponsesConceptPlanner:
                 "verbosity": "low",
                 "format": {
                     "type": "json_schema",
-                    "name": "graph_mind_concept_plan",
+                    "name": "turnbook_concept_plan",
                     "strict": True,
                     "schema": PLAN_SCHEMA,
                 },

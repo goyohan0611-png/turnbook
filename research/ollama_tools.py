@@ -3,7 +3,7 @@ same two sessions as opencode_models.py, without OpenCode's own ~18,000-token pr
 with no GPU that prompt alone took Ollama ~27 minutes per turn (11 tokens/s) and timed out.
 
 This checks the model's own part: does it save a fact it was not told to save, and look it up
-in a new session. A throwaway memory (GRAPH_MIND_HOME); nothing leaves the PC.
+in a new session. A throwaway memory (TURNBOOK_HOME); nothing leaves the PC.
 
     python ollama_tools.py qwen3:4b llama3.2:3b
 """
@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from mcp import ClientSession, StdioServerParameters  # noqa: E402
 from mcp.client.stdio import stdio_client  # noqa: E402
 
-from graph_mind.mcp_server import instructions  # noqa: E402
+from turnbook.mcp_server import instructions  # noqa: E402
 from opencode_models import ASK, TELL  # noqa: E402
 
 OLLAMA = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
@@ -40,8 +40,8 @@ def chat(model, messages, tools):
 
 
 async def session(model, prompt, home):
-    server = StdioServerParameters(command=sys.executable, args=["-m", "graph_mind.mcp_server"],
-                                   env={**os.environ, "GRAPH_MIND_HOME": str(home),
+    server = StdioServerParameters(command=sys.executable, args=["-m", "turnbook.mcp_server"],
+                                   env={**os.environ, "TURNBOOK_HOME": str(home),
                                         "PYTHONPATH": str(ROOT / "src"), "PYTHONUTF8": "1"})
     calls = []
     async with stdio_client(server) as (read, write), ClientSession(read, write) as client:

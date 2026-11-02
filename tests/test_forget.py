@@ -1,17 +1,17 @@
 """Forget a phrase on one PC: gone from its store and indexes, from the shared log, and from the
 other PC after its next sync, and the phrase itself is never written anywhere to make it so."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import os
 import sqlite3
 import tempfile
 import unittest
 
-from graph_mind import sharing
-from graph_mind.associative_memory import AssociativeMemoryIndex
-from graph_mind.conversation_memory import ConversationMemoryStore
-from graph_mind.forget import find, forget
-from graph_mind.local_brain import LocalBrainStore
+from turnbook import sharing
+from turnbook.associative_memory import AssociativeMemoryIndex
+from turnbook.conversation_memory import ConversationMemoryStore
+from turnbook.forget import find, forget
+from turnbook.local_brain import LocalBrainStore
 
 SECRET = "hunter2-correct-horse"
 T = "2026-10-08T10:00:00"
@@ -46,7 +46,7 @@ class ForgetTests(unittest.TestCase):
                      turn(3, "lunch was kimchi stew")]
             secret_memory = memory("m-secret", f"router login {SECRET}")
             try:
-                os.environ["GRAPH_MIND_DEVICE"] = "desk"
+                os.environ["TURNBOOK_DEVICE"] = "desk"
                 with ConversationMemoryStore(desk) as store:
                     for item in turns:
                         store.record(item)
@@ -56,11 +56,11 @@ class ForgetTests(unittest.TestCase):
                                       + [("memory", secret_memory)])
                 with AssociativeMemoryIndex(desk) as index:
                     index.sync_sources()
-                os.environ["GRAPH_MIND_DEVICE"] = "lap"
+                os.environ["TURNBOOK_DEVICE"] = "lap"
                 sharing.sync(shared, lap)
                 self.assertEqual(words(lap, "password"), ["t2"])
 
-                os.environ["GRAPH_MIND_DEVICE"] = "desk"
+                os.environ["TURNBOOK_DEVICE"] = "desk"
                 result = forget(SECRET, desk, shared)
                 self.assertEqual((result["turns"], result["memories"]), (1, 1))
                 self.assertEqual(find(desk, SECRET), {"turn_ids": [], "memory_ids": []})
@@ -74,13 +74,13 @@ class ForgetTests(unittest.TestCase):
                 for log in (shared / "log").glob("*.jsonl"):
                     self.assertNotIn(SECRET, log.read_text(encoding="utf-8"))
 
-                os.environ["GRAPH_MIND_DEVICE"] = "lap"
+                os.environ["TURNBOOK_DEVICE"] = "lap"
                 sharing.sync(shared, lap)               # the other PC follows on its next sync
                 self.assertEqual(find(lap, SECRET), {"turn_ids": [], "memory_ids": []})
                 self.assertEqual(words(lap, "password"), [])
                 self.assertEqual(sorted(words(lap, "build") + words(lap, "kimchi")), ["t1", "t3"])
             finally:
-                os.environ.pop("GRAPH_MIND_DEVICE", None)
+                os.environ.pop("TURNBOOK_DEVICE", None)
 
     def test_forgotten_from_a_postgres_hub(self):
         import psycopg
@@ -89,26 +89,26 @@ class ForgetTests(unittest.TestCase):
             root = Path(directory)
             desk, lap = root / "desk.sqlite", root / "lap.sqlite"
             try:
-                os.environ["GRAPH_MIND_DEVICE"] = "desk"
+                os.environ["TURNBOOK_DEVICE"] = "desk"
                 items = [turn(1, "the build is green again"), turn(2, f"password {SECRET}")]
                 with ConversationMemoryStore(desk) as store:
                     for item in items:
                         store.record(item)
                 sharing.append_many(hub, [("turn", t) for t in items])
-                os.environ["GRAPH_MIND_DEVICE"] = "lap"
+                os.environ["TURNBOOK_DEVICE"] = "lap"
                 sharing.sync(hub, lap)
-                os.environ["GRAPH_MIND_DEVICE"] = "desk"
+                os.environ["TURNBOOK_DEVICE"] = "desk"
                 forget(SECRET, desk, hub)
                 with psycopg.connect(hub) as connection:
                     lines = [row[0] for row in connection.execute("SELECT line FROM sharing")]
                 self.assertFalse(any(SECRET in line for line in lines))
                 self.assertTrue(any('"kind": "forget"' in line for line in lines))
-                os.environ["GRAPH_MIND_DEVICE"] = "lap"
+                os.environ["TURNBOOK_DEVICE"] = "lap"
                 sharing.sync(hub, lap)
                 self.assertEqual(find(lap, SECRET), {"turn_ids": [], "memory_ids": []})
                 self.assertEqual(words(lap, "build"), ["t1"])
             finally:
-                os.environ.pop("GRAPH_MIND_DEVICE", None)
+                os.environ.pop("TURNBOOK_DEVICE", None)
 
     def test_the_forgotten_text_leaves_the_file_itself(self):
         """Not just the rows: SQLite only marks deleted space free and FTS5 keeps a deleted
@@ -127,7 +127,7 @@ class ForgetTests(unittest.TestCase):
             self.assertEqual(left, 0)
 
     def test_short_phrases_are_refused(self):
-        from graph_mind import forget as module
+        from turnbook import forget as module
         with self.assertRaises(SystemExit):
             module.main(["abc", "--yes"])
 
@@ -136,8 +136,8 @@ class PromotedCopyTests(unittest.TestCase):
     def test_forgetting_a_turn_also_forgets_the_memory_promoted_from_it(self):
         """"Remember ..." turns are copied into a memory word for word: erasing the turn by id
         left that copy behind."""
-        from graph_mind.forget import erase
-        from graph_mind.semantic_memory import SemanticMemoryIngestion
+        from turnbook.forget import erase
+        from turnbook.semantic_memory import SemanticMemoryIngestion
         with tempfile.TemporaryDirectory() as directory:
             index = Path(directory) / "brain.sqlite"
             with ConversationMemoryStore(index) as store:
@@ -153,9 +153,9 @@ class OutboxTests(unittest.TestCase):
     def test_a_promoted_memory_leaves_the_outbox_with_its_turn(self):
         """forget_ids erased the memory promoted from a turn here, but kept sending it."""
         import json
-        from graph_mind.forget import forget_ids
-        from graph_mind.semantic_memory import SemanticMemoryIngestion
-        from graph_mind.sharing import _outbox
+        from turnbook.forget import forget_ids
+        from turnbook.semantic_memory import SemanticMemoryIngestion
+        from turnbook.sharing import _outbox
         with tempfile.TemporaryDirectory() as directory:
             index = Path(directory) / "brain.sqlite"
             with ConversationMemoryStore(index) as store:
@@ -180,13 +180,13 @@ class StagingTests(unittest.TestCase):
     def test_forgetting_blanks_the_hooks_own_copy(self):
         """A hook keeps what was typed, unmasked, until its session has been idle an hour."""
         import json
-        from graph_mind.forget import forget_ids
-        from graph_mind.paths import graph_mind_home
+        from turnbook.forget import forget_ids
+        from turnbook.paths import turnbook_home
         with tempfile.TemporaryDirectory() as directory:
             index = Path(directory) / "brain.sqlite"
             with ConversationMemoryStore(index) as store:
                 store.record(turn(1, "the vault door code is purple-otter-42"))
-            staged = graph_mind_home() / "hooks" / "gemini-cli" / "s.jsonl"
+            staged = turnbook_home() / "hooks" / "gemini-cli" / "s.jsonl"
             staged.parent.mkdir(parents=True, exist_ok=True)
             keep = json.dumps({"type": "user", "message": {"content": "hello"}})
             gone = json.dumps({"type": "user",
@@ -206,7 +206,7 @@ class TombstoneTests(unittest.TestCase):
     def test_a_forgotten_turn_is_not_brought_back_by_a_later_import(self):
         """Another PC's log, an outbox sent late or a transcript read again carried the same turn
         back in after it was forgotten."""
-        from graph_mind.forget import forget_ids
+        from turnbook.forget import forget_ids
         with tempfile.TemporaryDirectory() as directory:
             index = Path(directory) / "brain.sqlite"
             with ConversationMemoryStore(index) as store:

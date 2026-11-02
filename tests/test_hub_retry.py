@@ -1,11 +1,11 @@
 """Postgres's tools fail at random on some Windows PCs (AhnLab V3): hub setup tries again."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import subprocess
 import unittest
 from unittest import mock
 
-from graph_mind import sharing
+from turnbook import sharing
 
 
 class HubRetryTests(unittest.TestCase):
@@ -49,7 +49,7 @@ class HubRetryTests(unittest.TestCase):
         # administrator (CI) drops to a restricted token that cannot enter it
         home = Path(tempfile.gettempdir()) / f"graph-mind-retry-{os.getpid()}-{time.time_ns()}"
         home.mkdir()
-        with mock.patch.dict(os.environ, {"GRAPH_MIND_HOME": str(home)}), \
+        with mock.patch.dict(os.environ, {"TURNBOOK_HOME": str(home)}), \
                 mock.patch.object(sharing, "PORT", 54395), \
                 mock.patch.object(sharing, "_start", first_fails):
             try:

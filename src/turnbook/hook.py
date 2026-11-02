@@ -1,11 +1,11 @@
 """Hooks for agents that run a command per message but keep no transcript Turnbook can read
 (Gemini CLI; Cursor's and Copilot CLI's own transcripts are read instead):
-what was said is appended, in Claude Code's record shape, to ~/.graph-mind/hooks/<agent>/, and
+what was said is appended, in Claude Code's record shape, to ~/.turnbook/hooks/<agent>/, and
 the capture service stores it like every other conversation. Where the hook can add context
 (Gemini CLI's BeforeAgent), the memory that bears on the message goes in before the model
 answers, as with the OpenCode plugin.
 
-    python -m graph_mind.hook gemini-cli BeforeAgent      # stdin: the agent's hook JSON
+    python -m turnbook.hook gemini-cli BeforeAgent      # stdin: the agent's hook JSON
 
 turnbook-install registers these (install.agent_hooks). Any failure is silent: memory must
 never stand in the way of a message.
@@ -56,8 +56,8 @@ def within(seconds, work, *args):
 
 
 def hooks_root():
-    from graph_mind.paths import graph_mind_home
-    return graph_mind_home() / "hooks"
+    from turnbook.paths import turnbook_home
+    return turnbook_home() / "hooks"
 
 
 def record(agent: str, event_name: str, event: dict) -> str | None:
@@ -123,7 +123,7 @@ def reply(agent: str, event_name: str, text: str | None, event: dict | None = No
     if not text or (agent, event_name) not in {("gemini-cli", "BeforeAgent"),
                                                *INJECT_ONLY.items()}:
         return {}
-    from graph_mind.inject import context
+    from turnbook.inject import context
     memory = within(DEADLINE, context, text[:4000])
     if not memory:
         return {}

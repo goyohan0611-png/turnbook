@@ -1,6 +1,6 @@
 """install.py on a fresh, fake home: every app found gets the memory server, a second run (or a
 run after moving the folder) leaves exactly one entry, and the user's other settings survive."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 from unittest import mock
 import base64
@@ -10,7 +10,7 @@ import sys
 import tempfile
 import unittest
 
-from graph_mind import install
+from turnbook import install
 
 
 class InstallTests(unittest.TestCase):
@@ -40,20 +40,20 @@ class InstallTests(unittest.TestCase):
                 {"h": ["192.0.2.1"], "p": 54329, "k": "pw"}).encode()).decode()
             environment = {"USERPROFILE": str(home), "HOME": str(home), "XDG_CONFIG_HOME": "",
                            "APPDATA": str(home / "AppData" / "Roaming"),
-                           "GRAPH_MIND_HOME": str(home / ".graph-mind"),
-                           "GRAPH_MIND_CONFIG": str(home / ".graph-mind" / "config.json")}
+                           "TURNBOOK_HOME": str(home / ".graph-mind"),
+                           "TURNBOOK_CONFIG": str(home / ".graph-mind" / "config.json")}
             with mock.patch.dict(os.environ, environment), \
-                    mock.patch("graph_mind.install.shutil.which", return_value=None):
+                    mock.patch("turnbook.install.shutil.which", return_value=None):
                 for _ in range(2):
                     install.main(["--skip-packages", "--skip-model", "--no-start", "--yes",
                                   "--join", code])
             toml = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
             self.assertEqual(toml.count("[mcp_servers.graph-mind-memory]"), 1)
-            self.assertIn('args = ["-m", "graph_mind.mcp_server"]', toml)
+            self.assertIn('args = ["-m", "turnbook.mcp_server"]', toml)
             self.assertIn("[mcp_servers.other]", toml)
             self.assertNotIn("'old'", toml)
             self.assertNotIn("required", toml)       # a failing server must not block a chat
-            self.assertIn("GRAPH_MIND_CAPTURED", toml)
+            self.assertIn("TURNBOOK_CAPTURED", toml)
             code_cli = json.loads((home / ".claude.json").read_text(encoding="utf-8"))
             self.assertEqual(code_cli["keep"], 1)
             self.assertEqual(code_cli["mcpServers"]["graph-mind-memory"]["command"], sys.executable)
@@ -62,9 +62,9 @@ class InstallTests(unittest.TestCase):
             self.assertEqual(entry["args"], install.SERVER)
             self.assertEqual(entry["env"]["MINE"], "1")
             self.assertNotIn("type", entry)
-            self.assertNotIn("GRAPH_MIND_CAPTURED", entry["env"])     # desktop chat: not captured
+            self.assertNotIn("TURNBOOK_CAPTURED", entry["env"])     # desktop chat: not captured
             self.assertEqual(code_cli["mcpServers"]["graph-mind-memory"]["env"]
-                             ["GRAPH_MIND_CAPTURED"], "1")
+                             ["TURNBOOK_CAPTURED"], "1")
             login_item = {
                 "win32": home / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu"
                          / "Programs" / "Startup" / "Graph-MIND Automatic Capture.lnk",
@@ -80,7 +80,7 @@ class InstallTests(unittest.TestCase):
             # and back out: every app unregistered, the user's other settings untouched,
             # the memory kept unless asked to purge it
             with mock.patch.dict(os.environ, environment), \
-                    mock.patch("graph_mind.install.shutil.which", return_value=None):
+                    mock.patch("turnbook.install.shutil.which", return_value=None):
                 install.uninstall([])
                 toml = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
                 self.assertNotIn("graph-mind-memory", toml)
@@ -114,8 +114,8 @@ class InstallTests(unittest.TestCase):
             home = Path(directory)
             environment = {"USERPROFILE": str(home), "HOME": str(home), "XDG_CONFIG_HOME": "",
                            "APPDATA": str(home / "AppData" / "Roaming"),
-                           "GRAPH_MIND_HOME": str(home / ".graph-mind"),
-                           "GRAPH_MIND_CONFIG": str(home / ".graph-mind" / "config.json")}
+                           "TURNBOOK_HOME": str(home / ".graph-mind"),
+                           "TURNBOOK_CONFIG": str(home / ".graph-mind" / "config.json")}
             with mock.patch.dict(os.environ, environment):
                 vscode = install._vscode_user_dir(home)
             (home / ".cursor").mkdir()
@@ -130,7 +130,7 @@ class InstallTests(unittest.TestCase):
             (vscode / "mcp.json").write_text(json.dumps({"servers": {"other": {"command": "y"}}}),
                                              encoding="utf-8")
             with mock.patch.dict(os.environ, environment), \
-                    mock.patch("graph_mind.install.shutil.which", return_value=None):
+                    mock.patch("turnbook.install.shutil.which", return_value=None):
                 connected = install.other_apps(home)
                 self.assertEqual(sorted(connected), sorted(
                     ["Cursor", "Windsurf", "Gemini CLI", "LM Studio", "VS Code", "Cline"]))
@@ -159,20 +159,20 @@ class InstallTests(unittest.TestCase):
             home = Path(directory)
             environment = {"USERPROFILE": str(home), "HOME": str(home), "XDG_CONFIG_HOME": "",
                            "APPDATA": str(home / "AppData" / "Roaming"),
-                           "GRAPH_MIND_HOME": str(home / ".graph-mind"),
-                           "GRAPH_MIND_CONFIG": str(home / ".graph-mind" / "config.json")}
+                           "TURNBOOK_HOME": str(home / ".graph-mind"),
+                           "TURNBOOK_CONFIG": str(home / ".graph-mind" / "config.json")}
             folder = home / ".config" / "opencode"
             folder.mkdir(parents=True)
             config = folder / "opencode.jsonc"
             config.write_text(json.dumps({"model": "opencode/big-pickle",
                                           "instructions": ["mine.md"]}), encoding="utf-8")
             with mock.patch.dict(os.environ, environment), \
-                    mock.patch("graph_mind.install.shutil.which", return_value=None):
+                    mock.patch("turnbook.install.shutil.which", return_value=None):
                 self.assertEqual(install.opencode(home), "OpenCode")
                 settings = json.loads(config.read_text(encoding="utf-8"))
                 server = settings["mcp"]["graph-mind-memory"]
                 self.assertEqual(server["type"], "local")
-                self.assertEqual(server["command"][1:], ["-m", "graph_mind.mcp_server"])
+                self.assertEqual(server["command"][1:], ["-m", "turnbook.mcp_server"])
                 guide = str(folder / "graph-mind.md")
                 self.assertEqual(settings["instructions"], ["mine.md", guide])
                 self.assertIn("brain_remember", Path(guide).read_text(encoding="utf-8"))
@@ -198,12 +198,12 @@ class InstallTests(unittest.TestCase):
             (home / ".config" / "opencode").mkdir(parents=True)
             environment = {"USERPROFILE": str(home), "HOME": str(home), "XDG_CONFIG_HOME": "",
                            "APPDATA": str(home / "AppData" / "Roaming"), "COPILOT_HOME": "",
-                           "GRAPH_MIND_HOME": str(home / ".graph-mind"),
-                           "GRAPH_MIND_CONFIG": str(home / ".graph-mind" / "config.json")}
+                           "TURNBOOK_HOME": str(home / ".graph-mind"),
+                           "TURNBOOK_CONFIG": str(home / ".graph-mind" / "config.json")}
             ours = [home / ".copilot" / "hooks" / "turnbook.json",
                     home / ".config" / "opencode" / "graph-mind.md"]
             with mock.patch.dict(os.environ, environment), \
-                    mock.patch("graph_mind.install.shutil.which", return_value=None), \
+                    mock.patch("turnbook.install.shutil.which", return_value=None), \
                     mock.patch("builtins.print"):
                 install.main(["--skip-packages", "--skip-model", "--no-start", "--yes"])
                 self.assertTrue(all(path.exists() for path in ours))
@@ -217,20 +217,20 @@ class InstallTests(unittest.TestCase):
 
     def test_model_goes_to_own_folder_when_the_usual_cache_is_locked(self):
         """A fresh Windows profile refused ~/.cache (access denied): Hugging Face's whole home
-        moves to ~/.graph-mind/huggingface, and every later process is pointed there."""
-        from graph_mind import local_embedder
+        moves to ~/.turnbook/huggingface, and every later process is pointed there."""
+        from turnbook import local_embedder
         def locked(*_):
             raise PermissionError(5, "Access is denied: ~/.cache/huggingface")
         with tempfile.TemporaryDirectory() as directory, \
-                mock.patch.dict(os.environ, {"GRAPH_MIND_HOME": directory}), \
+                mock.patch.dict(os.environ, {"TURNBOOK_HOME": directory}), \
                 mock.patch.object(local_embedder, "model_paths", locked), \
-                mock.patch("graph_mind.install.remove_old_models"), \
-                mock.patch("graph_mind.install.subprocess.run") as retry:
+                mock.patch("turnbook.install.remove_old_models"), \
+                mock.patch("turnbook.install.subprocess.run") as retry:
             os.environ.pop("HF_HOME", None)
             install.embedding_model()
             own = str(Path(directory) / "huggingface")
             self.assertEqual(retry.call_args.kwargs["env"]["HF_HOME"], own)
-            from graph_mind import local_embedder
+            from turnbook import local_embedder
             local_embedder.use_own_hf_home()          # what the server does when it starts
             self.assertEqual(os.environ["HF_HOME"], own)
 

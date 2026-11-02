@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from graph_mind.vector_cache import VectorCache  # noqa: E402
+from turnbook.vector_cache import VectorCache  # noqa: E402
 
 CACHE = Path(__file__).resolve().parent.parent / "bench/.cache"
 for source in map(Path, sys.argv[1:]):

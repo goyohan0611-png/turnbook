@@ -1,6 +1,6 @@
 """Project documents (specs, design notes, READMEs) kept beside the conversations.
 
-`turnbook docs add <folder>` lists a folder in ~/.graph-mind/documents.json; the capture service
+`turnbook docs add <folder>` lists a folder in ~/.turnbook/documents.json; the capture service
 reads its Markdown and text files, cuts them at headings, and stores each section as a turn
 (client "document", role "document"), so the word and meaning searches, the re-ranker and the
 packets need nothing new. A section is stored once per distinct text: an edited section is a new
@@ -15,8 +15,8 @@ import json
 import os
 import re
 
-from graph_mind.conversation_memory import _redact
-from graph_mind.paths import graph_mind_home
+from turnbook.conversation_memory import _redact
+from turnbook.paths import turnbook_home
 
 SUFFIXES = {".md", ".markdown", ".txt", ".rst"}
 SKIP_DIRS = {"node_modules", "venv", "__pycache__", "dist", "build", "target", "site-packages"}
@@ -28,7 +28,7 @@ HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 
 
 def folders_file() -> Path:
-    return graph_mind_home() / "documents.json"
+    return turnbook_home() / "documents.json"
 
 
 def folders() -> list[str]:

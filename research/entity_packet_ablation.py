@@ -19,7 +19,7 @@ from pathlib import Path
 import json
 
 import longmemeval_retrieval_executor as pipe
-from graph_mind.entity_timeline import normalize
+from turnbook.entity_timeline import normalize
 from longmemeval_adapter import load_instances
 
 RUN = Path("runs/graph-v3.8-dev2-k16")

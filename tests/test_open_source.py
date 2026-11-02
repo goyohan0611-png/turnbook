@@ -4,7 +4,7 @@ LongMemEval 1903aded: the packet held the user's "brainstorm work-from-home jobs
 but not the assistant's list right after it, where item 7 was the answer (Transcriptionist).
 The model said it did not know. brain_recall(source=...) hands it that exchange.
 """
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import asyncio
 import re
@@ -13,8 +13,8 @@ import unittest
 
 from mcp import Client
 
-from graph_mind.conversation_memory import ConversationMemoryStore
-from graph_mind.mcp_server import build_server, wait_for_index
+from turnbook.conversation_memory import ConversationMemoryStore
+from turnbook.mcp_server import build_server, wait_for_index
 
 TALK = [("user", "Morning! Can you help me plan my week?"),
         ("assistant", "Sure. Start with the three things that must happen."),

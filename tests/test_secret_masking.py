@@ -1,14 +1,14 @@
 """Secrets never reach the store: not from captured chat, and not from a proactive
 brain_remember."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import tempfile
 import unittest
 
 from mcp import Client
 
-from graph_mind.conversation_memory import _redact
-from graph_mind.mcp_server import build_server, wait_for_index
+from turnbook.conversation_memory import _redact
+from turnbook.mcp_server import build_server, wait_for_index
 
 KEYS = {
     "sk-proj-" + "a" * 40: "[REDACTED_OPENAI_KEY]",
@@ -26,7 +26,7 @@ class SecretMaskingTests(unittest.IsolatedAsyncioTestCase):
         config = Path(tempfile.mkdtemp()) / "config.json"
         config.write_text('{"mask_secrets": false}', encoding="utf-8")
         secret = "sk-proj-" + "a" * 40
-        with mock.patch.dict("os.environ", {"GRAPH_MIND_CONFIG": str(config)}):
+        with mock.patch.dict("os.environ", {"TURNBOOK_CONFIG": str(config)}):
             self.assertEqual(_redact(f"my key {secret}"), (f"my key {secret}", 0))
         self.assertEqual(_redact(f"my key {secret}")[0], "my key [REDACTED_OPENAI_KEY]")
 

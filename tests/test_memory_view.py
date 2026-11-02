@@ -1,12 +1,12 @@
 """turnbook-view draws the association graph; with --no-text the page holds no conversation."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import tempfile
 import unittest
 
-from graph_mind import memory_view
-from graph_mind.associative_memory import AssociativeMemoryIndex
-from graph_mind.conversation_memory import ConversationMemoryStore
+from turnbook import memory_view
+from turnbook.associative_memory import AssociativeMemoryIndex
+from turnbook.conversation_memory import ConversationMemoryStore
 
 TEXTS = ["콩이랑 해변 산책 다녀옴", "콩이 사료 바꿨더니 잘 먹네", "서버 배포 스크립트 고쳤다",
          "배포 서버 포트 54329로 고정", "점심은 김치찌개", "콩이 병원 예약 금요일"]

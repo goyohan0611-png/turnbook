@@ -1,7 +1,7 @@
-"""Gemini CLI: its hook payloads (as documented) are saved through graph_mind.hook and stored
+"""Gemini CLI: its hook payloads (as documented) are saved through turnbook.hook and stored
 once; the installer adds our hooks next to the user's own and takes only ours away again.
 Copilot CLI and Cursor: their own transcripts are read, in the shape they were seen to write."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 from unittest import mock
 import io
@@ -10,8 +10,8 @@ import os
 import tempfile
 import unittest
 
-from graph_mind import hook, install
-from graph_mind.conversation_memory import (ConversationMemoryStore, CopilotConversationCapture,
+from turnbook import hook, install
+from turnbook.conversation_memory import (ConversationMemoryStore, CopilotConversationCapture,
                                             CursorConversationCapture, HookConversationCapture)
 
 
@@ -28,7 +28,7 @@ def run(agent, event, payload):
 class HookTests(unittest.TestCase):
     def test_gemini_cli_is_saved_once(self):
         with tempfile.TemporaryDirectory() as directory, \
-                mock.patch.dict(os.environ, {"GRAPH_MIND_HOME": directory}):
+                mock.patch.dict(os.environ, {"TURNBOOK_HOME": directory}):
             run("gemini-cli", "BeforeAgent", {"session_id": "g1", "cwd": directory,
                                               "hook_event_name": "BeforeAgent",
                                               "prompt": "our golden retriever Kongi turned three"})
@@ -59,7 +59,7 @@ class HookTests(unittest.TestCase):
         # on their time and the order (and so what the forget swept) was left to chance
         seconds = iter(range(100))
         with tempfile.TemporaryDirectory() as directory, \
-                mock.patch.dict(os.environ, {"GRAPH_MIND_HOME": directory}), \
+                mock.patch.dict(os.environ, {"TURNBOOK_HOME": directory}), \
                 mock.patch.object(hook, "_now",
                                   lambda: f"2026-10-19T00:00:{next(seconds):02d}.000000Z"):
             def say(event, **fields):
@@ -126,12 +126,12 @@ class HookTests(unittest.TestCase):
 
     def test_hook_command_survives_a_space_and_a_shadowing_project(self):
         """Gemini CLI runs hooks through PowerShell on Windows, where a quoted path alone is a
-        string; and apps start them in the user's project, where a graph_mind.py shadowed us."""
+        string; and apps start them in the user's project, where a turnbook.py shadowed us."""
         python = r"C:\Users\Jane Doe\py\python.exe"
         with mock.patch.object(install.sys, "executable", python), \
                 mock.patch.object(install.os, "name", "nt"):
             self.assertEqual(install._hook_command("gemini-cli", "BeforeAgent"),
-                             f"& '{python}' -m graph_mind.hook gemini-cli BeforeAgent")
+                             f"& '{python}' -m turnbook.hook gemini-cli BeforeAgent")
         # single quotes: in double quotes PowerShell expanded "$Doe" and ran "$(...)"
         with mock.patch.object(install.sys, "executable", r"C:\Users\O'Neil $(calc)\python.exe"), \
                 mock.patch.object(install.os, "name", "nt"):
@@ -155,10 +155,10 @@ class HookTests(unittest.TestCase):
             def env(*parts):
                 return json.loads(home.joinpath(*parts).read_text(encoding="utf-8"))[
                     "mcpServers"]["graph-mind-memory"]["env"]
-            self.assertEqual(env(".gemini", "settings.json").get("GRAPH_MIND_CAPTURED"), "1")
-            self.assertEqual(env(".copilot", "mcp-config.json").get("GRAPH_MIND_CAPTURED"), "1")
-            self.assertNotIn("GRAPH_MIND_CAPTURED", env(".lmstudio", "mcp.json"))
-            self.assertNotIn("GRAPH_MIND_CAPTURED", env(".cursor", "mcp.json"))   # editor: unseen
+            self.assertEqual(env(".gemini", "settings.json").get("TURNBOOK_CAPTURED"), "1")
+            self.assertEqual(env(".copilot", "mcp-config.json").get("TURNBOOK_CAPTURED"), "1")
+            self.assertNotIn("TURNBOOK_CAPTURED", env(".lmstudio", "mcp.json"))
+            self.assertNotIn("TURNBOOK_CAPTURED", env(".cursor", "mcp.json"))   # editor: unseen
             # Gemini's hooks break (an unexpected "hooks" value): nothing saves its chats now,
             # so the flag that told the model not to save them goes, even if set before
             settings = home / ".gemini" / "settings.json"
@@ -168,7 +168,7 @@ class HookTests(unittest.TestCase):
             with mock.patch.dict(os.environ, environment):
                 self.assertNotIn("Gemini CLI", install.agent_hooks(home))
                 install.other_apps(home)
-            self.assertNotIn("GRAPH_MIND_CAPTURED", env(".gemini", "settings.json"))
+            self.assertNotIn("TURNBOOK_CAPTURED", env(".gemini", "settings.json"))
 
     def test_copilot_cli_session_is_read_as_said(self):
         """Records as Copilot CLI 1.0.98 writes them: what was typed (not transformedContent),
@@ -207,7 +207,7 @@ class HookTests(unittest.TestCase):
     def test_the_memory_a_hook_added_is_not_stored_as_the_users_words(self):
         """Copilot CLI keeps the prompt our hook extended as the user's message: stored again,
         each packet would come back as something the user said."""
-        from graph_mind.inject import HEADER
+        from turnbook.inject import HEADER
         with tempfile.TemporaryDirectory() as directory:
             session = Path(directory) / "state" / "s1"
             session.mkdir(parents=True)
@@ -230,7 +230,7 @@ class HookTests(unittest.TestCase):
         self.assertEqual([r[0] for r in rows], ["what did I eat?"])
 
     def test_gemini_gets_the_memory_before_it_answers(self):
-        with mock.patch("graph_mind.inject.context", return_value="Turnbook memory: Kongi"):
+        with mock.patch("turnbook.inject.context", return_value="Turnbook memory: Kongi"):
             answer = run("gemini-cli", "BeforeAgent", {"session_id": "g2", "prompt": "my dog?"})
         self.assertEqual(answer["hookSpecificOutput"]["additionalContext"],
                          "Turnbook memory: Kongi")
@@ -252,7 +252,7 @@ class HookTests(unittest.TestCase):
             self.assertEqual(gemini["theme"], "Dracula")
             self.assertEqual(gemini["hooks"]["BeforeAgent"][0], theirs)
             self.assertEqual(len(gemini["hooks"]["BeforeAgent"]), 2)
-            self.assertIn("graph_mind.hook gemini-cli AfterAgent",
+            self.assertIn("turnbook.hook gemini-cli AfterAgent",
                           gemini["hooks"]["AfterAgent"][0]["hooks"][0]["command"])
             install.agent_hooks(home, remove=True)
             self.assertEqual(read()["hooks"], {"BeforeAgent": [theirs], "enabled": True})
@@ -261,8 +261,8 @@ class HookTests(unittest.TestCase):
         """Claude Code, Codex, Copilot CLI: their hook adds the memory for the message in each
         one's shape, and saves nothing (their transcripts are read already)."""
         with tempfile.TemporaryDirectory() as directory, \
-                mock.patch.dict(os.environ, {"GRAPH_MIND_HOME": directory}), \
-                mock.patch("graph_mind.inject.context", lambda text: "MEMORY for " + text):
+                mock.patch.dict(os.environ, {"TURNBOOK_HOME": directory}), \
+                mock.patch("turnbook.inject.context", lambda text: "MEMORY for " + text):
             prompt = {"session_id": "c1", "prompt": "where did we leave off?"}
             for agent in ("claude-code", "codex"):
                 self.assertEqual(run(agent, "UserPromptSubmit", prompt), {"hookSpecificOutput": {
@@ -273,22 +273,22 @@ class HookTests(unittest.TestCase):
                              {"modifiedTransformedPrompt":
                               "<date/> where?\n\nMEMORY for where did we leave off?"})
             self.assertFalse(hook.hooks_root().exists())                # nothing saved
-        with mock.patch("graph_mind.inject.context", lambda text: ""):
+        with mock.patch("turnbook.inject.context", lambda text: ""):
             self.assertEqual(run("codex", "UserPromptSubmit", {"prompt": "hi"}), {})
 
     def test_the_message_hook_does_not_wait_on_the_shared_hub(self):
         """The memory servers pull other devices' lines; a hub connection per message added
         0.8-5 s before every answer."""
-        from graph_mind import inject
+        from turnbook import inject
         with tempfile.TemporaryDirectory() as directory, \
-                mock.patch.dict(os.environ, {"GRAPH_MIND_HOME": directory}), \
-                mock.patch("graph_mind.mcp_server.shared_sync",
+                mock.patch.dict(os.environ, {"TURNBOOK_HOME": directory}), \
+                mock.patch("turnbook.mcp_server.shared_sync",
                            side_effect=AssertionError("hub synced per message")):
             inject.context("where did we leave off on the launch?")
 
     def test_earlier_messages_with_the_same_words_are_left_out(self):
         """"했어" brought back four older "했어" and nothing else, in every packet."""
-        from graph_mind import inject
+        from turnbook import inject
 
         def turn(n, text):
             return {"turn_id": f"t{n}", "role": "user", "scope": "global", "content": text,
@@ -298,12 +298,12 @@ class HookTests(unittest.TestCase):
         useful = {"matches": [], "conversation_turns": [turn(3, "했어"),
                                                         turn(4, "배포는 금요일에 했어")]}
         with tempfile.TemporaryDirectory() as directory, \
-                mock.patch.dict(os.environ, {"GRAPH_MIND_HOME": directory}), \
-                mock.patch("graph_mind.inject.from_service", return_value=None), \
-                mock.patch("graph_mind.mcp_server.embedder_for"):
-            with mock.patch("graph_mind.mcp_server.gather", return_value=echoes):
+                mock.patch.dict(os.environ, {"TURNBOOK_HOME": directory}), \
+                mock.patch("turnbook.inject.from_service", return_value=None), \
+                mock.patch("turnbook.mcp_server.embedder_for"):
+            with mock.patch("turnbook.mcp_server.gather", return_value=echoes):
                 self.assertEqual(inject.context("했어"), "")
-            with mock.patch("graph_mind.mcp_server.gather", return_value=useful):
+            with mock.patch("turnbook.mcp_server.gather", return_value=useful):
                 packet = inject.context("했어")
         self.assertIn("배포는 금요일에 했어", packet)
         self.assertEqual(packet.count("conversation turn"), 1)
@@ -311,23 +311,23 @@ class HookTests(unittest.TestCase):
     def test_the_hook_asks_the_capture_service_first(self):
         """Its index is warm: a fresh process per message took 1-2 s to import and read it.
         An older service (no "context" in embedder.json) leaves the hook to search itself."""
-        from graph_mind import inject, local_embedder
+        from turnbook import inject, local_embedder
         lender = mock.Mock(model_name=local_embedder.LOCAL_MODEL)
         message = "where did we leave off on the launch?"
         with tempfile.TemporaryDirectory() as directory, \
-                mock.patch.dict(os.environ, {"GRAPH_MIND_HOME": directory}):
+                mock.patch.dict(os.environ, {"TURNBOOK_HOME": directory}):
             local_embedder.serve(lender)
             self.assertIsNone(inject.from_service(message))
             local_embedder.serve(lender, context=lambda m: "SERVED " + m)
-            with mock.patch("graph_mind.mcp_server.gather",
+            with mock.patch("turnbook.mcp_server.gather",
                             side_effect=AssertionError("searched in the hook's process")):
                 self.assertEqual(inject.context(message), "SERVED " + message)
 
     def test_opencodes_plugin_gets_the_same_deadline(self):
-        """python -m graph_mind.inject waited for the search however long it took (the plugin
+        """python -m turnbook.inject waited for the search however long it took (the plugin
         gave it 15 s)."""
         import time
-        from graph_mind import inject
+        from turnbook import inject
         out = io.StringIO()
         with mock.patch.object(hook, "DEADLINE", 0.2), \
                 mock.patch.object(inject, "context", lambda text: time.sleep(2) or "late"), \
@@ -343,19 +343,19 @@ class HookTests(unittest.TestCase):
     def test_every_message_is_searched_with_no_keyword_needed(self):
         """Whether a message needs the past is the model's call: a keyword list missed
         "오늘 점심 뭐 먹었지?". Only an empty message is skipped."""
-        from graph_mind import inject
+        from turnbook import inject
         asked = []
-        with mock.patch("graph_mind.inject.from_service", lambda q: asked.append(q) or "M"):
+        with mock.patch("turnbook.inject.from_service", lambda q: asked.append(q) or "M"):
             self.assertEqual(inject.context("오늘 점심 뭐 먹었지?"), "M")
             self.assertEqual(inject.context("   "), "")
         self.assertEqual(asked, ["오늘 점심 뭐 먹었지?"])
 
     def test_a_pasted_log_is_searched_by_its_two_ends(self):
         """The question sits at the start or end; the middle only slowed the search."""
-        from graph_mind import inject
+        from turnbook import inject
         asked = []
         message = "where did we leave off? " + "Traceback line " * 400 + " same error as last time?"
-        with mock.patch("graph_mind.inject.from_service", lambda q: asked.append(q) or "M"):
+        with mock.patch("turnbook.inject.from_service", lambda q: asked.append(q) or "M"):
             self.assertEqual(inject.context(message), "M")
         self.assertLessEqual(len(asked[0]), 2 * inject.ENDS + 1)
         self.assertTrue(asked[0].startswith("where did we leave off?"))
@@ -366,7 +366,7 @@ class HookTests(unittest.TestCase):
         DEADLINE seconds (it waited 7-22 s)."""
         import time
         with mock.patch.object(hook, "DEADLINE", 0.2), \
-                mock.patch("graph_mind.inject.context", lambda text: time.sleep(2) or "late"):
+                mock.patch("turnbook.inject.context", lambda text: time.sleep(2) or "late"):
             began = time.monotonic()
             self.assertEqual(hook.reply("codex", "UserPromptSubmit", "where were we?"), {})
             self.assertLess(time.monotonic() - began, 1.0)
@@ -386,10 +386,10 @@ class HookTests(unittest.TestCase):
             claude = json.loads((home / ".claude" / "settings.json").read_text(encoding="utf-8"))
             self.assertEqual(claude["model"], "opus")
             self.assertEqual(claude["hooks"]["UserPromptSubmit"][0], theirs)
-            self.assertIn("graph_mind.hook claude-code UserPromptSubmit",
+            self.assertIn("turnbook.hook claude-code UserPromptSubmit",
                           claude["hooks"]["UserPromptSubmit"][1]["hooks"][0]["command"])
             codex = json.loads((home / ".codex" / "hooks.json").read_text(encoding="utf-8"))
-            self.assertIn("graph_mind.hook codex UserPromptSubmit",
+            self.assertIn("turnbook.hook codex UserPromptSubmit",
                           codex["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"])
             copilot = json.loads((home / ".copilot" / "hooks" / "turnbook.json")
                                  .read_text(encoding="utf-8"))

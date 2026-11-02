@@ -22,7 +22,7 @@ import json
 import sqlite3
 import sys
 
-from graph_mind.packing import text_columns, unpack
+from turnbook.packing import text_columns, unpack
 
 
 def find(index: Path, phrase: str) -> dict:
@@ -174,15 +174,15 @@ def _keys(ids: dict) -> list[str]:
 
 def scrub_shared(shared, ids: dict) -> int:
     """Remove the targets' lines from the shared log. Returns how many lines went."""
-    from graph_mind.sharing import _pg, is_database
+    from turnbook.sharing import _pg, is_database
     keys = _keys(ids)
     if not keys:
         return 0
     if is_database(shared):
-        from graph_mind.sharing import _opener
+        from turnbook.sharing import _opener
         with _pg(shared) as connection:          # lines are sealed: open each to find targets
             doomed, opened = [], _opener(shared)
-            rows = connection.cursor(name="graph_mind_scrub")   # streamed, not all in memory
+            rows = connection.cursor(name="turnbook_scrub")   # streamed, not all in memory
             rows.execute("SELECT seq, line FROM sharing")
             for seq, line in rows:
                 text = opened(line) or line         # a refused plain line goes too
@@ -193,7 +193,7 @@ def scrub_shared(shared, ids: dict) -> int:
                 connection.execute("DELETE FROM sharing WHERE seq = ANY(%s)", (doomed,))
             connection.commit()
         return len(doomed)
-    from graph_mind.sharing import _opener
+    from turnbook.sharing import _opener
     opened = _opener(shared)
 
     def doomed(line):
@@ -220,8 +220,8 @@ def scrub_staging(contents) -> int:
     turns. They keep what was typed, before masking, until a session has been idle an hour: a
     forgotten password stayed there all that time. Same length, in place: the capture service's
     read offsets stay valid, and a line appended meanwhile is left alone."""
-    from graph_mind.conversation_memory import _redact
-    from graph_mind.paths import graph_mind_home
+    from turnbook.conversation_memory import _redact
+    from turnbook.paths import turnbook_home
     wanted = {c.strip() for c in contents if c and c.strip()}
     if not wanted:
         return 0
@@ -231,7 +231,7 @@ def scrub_staging(contents) -> int:
         except ValueError:
             return False
         return any(_redact(text)[0].strip() in wanted for text in _strings(record))
-    home = graph_mind_home()
+    home = turnbook_home()
     return sum(_blank(path, doomed) for path in
                [*(home / "hooks").glob("*/*.jsonl"), *(home / "opencode").glob("*.jsonl")])
 
@@ -240,7 +240,7 @@ def drop_from_outbox(ids: dict) -> int:
     """Lines waiting to be sent to a hub that was down: a forgotten turn must not leave later."""
     import fasteners
 
-    from graph_mind.sharing import _outbox
+    from turnbook.sharing import _outbox
     keys = _keys(ids)
     outbox = _outbox()
     if not outbox.exists():
@@ -294,7 +294,7 @@ def forget_ids(ids: dict, index: Path, shared=None) -> dict:
 
 
 def _destination(shared):
-    from graph_mind.sharing import is_database
+    from turnbook.sharing import is_database
     return str(shared) if is_database(shared) else str(Path(shared).expanduser().resolve())
 
 
@@ -308,7 +308,7 @@ def retry_deletions(index: Path, *, shared=None, wait=False) -> dict:
     5 s, and each retry read every log again."""
     import time
 
-    from graph_mind.sharing import append
+    from turnbook.sharing import append
     outcome = {"shared_lines_removed": 0, "shared_delete_pending": 0}
     if not Path(index).is_file():
         return outcome
@@ -385,8 +385,8 @@ def masked_preview(text: str, width: int = 90) -> str:
 
 
 def main(argv=None):
-    from graph_mind.paths import default_development_db
-    from graph_mind.sharing import folder
+    from turnbook.paths import default_development_db
+    from turnbook.sharing import folder
     parser = argparse.ArgumentParser(description="Forget every captured turn and memory "
                                                  "that contains a phrase, on every PC.")
     parser.add_argument("phrase", nargs="?", help="omit it to type it without echo")

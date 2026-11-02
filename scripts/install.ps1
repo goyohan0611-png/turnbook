@@ -5,7 +5,7 @@
 # It installs uv (Astral's installer, to your user folder, no administrator rights), which
 # brings its own Python 3.12; installs Turnbook with it; then connects your AI apps
 # (turnbook-install). Arguments after the script go to turnbook-install, e.g. --name "Your Name"
-# or --join <code>. Set GRAPH_MIND_VERSION to install one version (CI does).
+# or --join <code>. Set TURNBOOK_VERSION to install one version (CI does).
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
@@ -15,7 +15,8 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
 }
 
-$spec = if ($env:GRAPH_MIND_VERSION) { "turnbook==$env:GRAPH_MIND_VERSION" } else { "turnbook" }
+$pin = if ($env:TURNBOOK_VERSION) { $env:TURNBOOK_VERSION } else { $env:GRAPH_MIND_VERSION }  # old name
+$spec = if ($pin) { "turnbook==$pin" } else { "turnbook" }
 # the name before 0.9.44: its commands would clash with these; the memory itself is kept
 if ((uv tool list 2>$null) -match "^graph-mind-memory ") { uv tool uninstall graph-mind-memory | Out-Null }
 Write-Host "Turnbook: installing $spec..."

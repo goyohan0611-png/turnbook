@@ -72,13 +72,13 @@ After `pip install turnbook`:
   "mcpServers": {
     "turnbook": {
       "command": "python",
-      "args": ["-m", "graph_mind.mcp_server"]
+      "args": ["-m", "turnbook.mcp_server"]
     }
   }
 }
 ```
 
-Claude Code: `claude mcp add turnbook -- python -m graph_mind.mcp_server`. This gives the
+Claude Code: `claude mcp add turnbook -- python -m turnbook.mcp_server`. This gives the
 tools only; `turnbook-install` also saves every conversation automatically.
 </details>
 
@@ -325,7 +325,7 @@ default model, search by meaning trails English by about 3 points in Korean, and
 question finds an English memory about as often: [In Korean](#in-korean).
 
 **How do I remove it?** `turnbook-uninstall` disconnects every app and stops the service; the
-memory stays in `~/.graph-mind` unless you add `--purge`.
+memory stays in `~/.turnbook` unless you add `--purge`.
 
 > [!NOTE]
 > **Beta.** Used daily on Windows. macOS and Linux pass every test in CI but have not seen daily

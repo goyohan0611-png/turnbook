@@ -47,7 +47,7 @@ def question_terms(text: str) -> list[str]:
     """The question's words; with STEM, Korean particles off as word search does."""
     if not STEM:
         return tokens(text)
-    from graph_mind.conversation_memory import search_terms
+    from turnbook.conversation_memory import search_terms
     return [w for w in search_terms(text) if w not in lc.STOP]
 
 

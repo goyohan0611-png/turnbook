@@ -24,11 +24,11 @@ from evidence import CACHE, DATA, fill  # noqa: E402
 from locomo_pools import POOL, hits  # noqa: E402
 from longmemeval_m_fetch import stream_instances  # noqa: E402
 
-from graph_mind.conversation_memory import ConversationMemoryStore  # noqa: E402
-from graph_mind.local_embedder import PRESETS, LocalEmbedder  # noqa: E402
+from turnbook.conversation_memory import ConversationMemoryStore  # noqa: E402
+from turnbook.local_embedder import PRESETS, LocalEmbedder  # noqa: E402
 LOCAL_MODEL = PRESETS["multilingual"]   # the pools' default: files without a model suffix
-from graph_mind.mcp_server import _PIECES, CONTEXT_LIMIT, excerpt, fuse, semantic_turns  # noqa: E402
-from graph_mind.warmup import warm_turns  # noqa: E402
+from turnbook.mcp_server import _PIECES, CONTEXT_LIMIT, excerpt, fuse, semantic_turns  # noqa: E402
+from turnbook.warmup import warm_turns  # noqa: E402
 
 OUT = ROOT / "research/runs/graph-v9.20-learning/lme_pools.json"
 

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from graph_mind.automatic_capture import AutomaticCaptureService
+from turnbook.automatic_capture import AutomaticCaptureService
 
 stall = AutomaticCaptureService._stall_warnings
 

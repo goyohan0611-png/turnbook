@@ -5,7 +5,7 @@
 //    with the user's other agents. Nothing else: no tool calls, no reasoning, except a mark
 //    where brain_forget ran, so the conversation about deleting is not kept either.
 // 2. Before the model answers a message, the memory that bears on it is added to the system
-//    prompt (python -m graph_mind.inject), so every model gets the past, not only the ones that
+//    prompt (python -m turnbook.inject), so every model gets the past, not only the ones that
 //    think to call brain_context.
 // Any failure is silent: memory must never stand in the way of a message.
 import { appendFileSync, closeSync, fchmodSync, mkdirSync, openSync } from "node:fs";
@@ -35,7 +35,7 @@ function recall(text) {
       // -c without the current folder: Python 3.10 ignores PYTHONSAFEPATH
       const child = execFile(PYTHON, ["-c",
         "import sys; sys.path[:] = [p for p in sys.path if p]; " +
-        "import runpy; runpy.run_module('graph_mind.inject', run_name='__main__')"],
+        "import runpy; runpy.run_module('turnbook.inject', run_name='__main__')"],
         { timeout: INJECT_TIMEOUT_MS, windowsHide: true, maxBuffer: 1 << 20,
           env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", PYTHONSAFEPATH: "1" } },
         (error, stdout) => resolve(error ? "" : String(stdout || "")));

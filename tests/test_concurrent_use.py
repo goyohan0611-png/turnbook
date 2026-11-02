@@ -1,5 +1,5 @@
 """Claude, Codex and the capture service write one memory file from separate processes at once."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import subprocess
 import sys
@@ -8,7 +8,7 @@ import unittest
 
 WRITER = """
 import sys
-from graph_mind.conversation_memory import ConversationMemoryStore
+from turnbook.conversation_memory import ConversationMemoryStore
 path, name = sys.argv[1], sys.argv[2]
 for i in range(150):
     with ConversationMemoryStore(path) as store:
@@ -30,7 +30,7 @@ class ConcurrentUseTests(unittest.TestCase):
                        for name in ("claude", "codex", "capture")]
             errors = [w.communicate(timeout=240)[1] for w in writers]
             self.assertEqual([w.returncode for w in writers], [0, 0, 0], errors)
-            from graph_mind.conversation_memory import ConversationMemoryStore
+            from turnbook.conversation_memory import ConversationMemoryStore
             with ConversationMemoryStore(path) as store:
                 count = store.db.execute("SELECT COUNT(*) FROM conversation_turns").fetchone()[0]
             self.assertEqual(count, 450)

@@ -68,13 +68,13 @@ Python이 없어도 되고, 따로 설정할 것도 없습니다. 설치 후 AI 
   "mcpServers": {
     "turnbook": {
       "command": "python",
-      "args": ["-m", "graph_mind.mcp_server"]
+      "args": ["-m", "turnbook.mcp_server"]
     }
   }
 }
 ```
 
-Claude Code: `claude mcp add turnbook -- python -m graph_mind.mcp_server`. 이렇게 하면 도구만
+Claude Code: `claude mcp add turnbook -- python -m turnbook.mcp_server`. 이렇게 하면 도구만
 연결됩니다. 대화 자동 저장까지 쓰려면 `turnbook-install`을 실행하세요.
 </details>
 
@@ -306,7 +306,7 @@ Turnbook 자체 코드나 라이선스에 포함되지 않습니다.
 검색은 영어보다 약 3%p 낮고, 한국어로 물어 영어 기억을 찾는 것도 비슷하게 됩니다:
 [한국어에서는](#한국어에서는).
 
-**지우려면?** `turnbook-uninstall`이 모든 앱 연결을 끊고 서비스를 멈춥니다. 기억은 `~/.graph-mind`에
+**지우려면?** `turnbook-uninstall`이 모든 앱 연결을 끊고 서비스를 멈춥니다. 기억은 `~/.turnbook`에
 남고, `--purge`를 붙이면 기억까지 지웁니다.
 
 > [!NOTE]

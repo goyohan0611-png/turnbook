@@ -10,9 +10,9 @@ import sqlite3
 import unicodedata
 import uuid
 
-from graph_mind.clock import timestamp
-from graph_mind.context_packet import PROFILE_FIELDS, default_profile, normalize_profile
-from graph_mind.paths import use_wal
+from turnbook.clock import timestamp
+from turnbook.context_packet import PROFILE_FIELDS, default_profile, normalize_profile
+from turnbook.paths import use_wal
 
 CONTRACT_VERSION = "local-brain-v0.1"
 
@@ -165,7 +165,7 @@ class LocalBrainStore:
     def remember(self, memory):
         if not isinstance(memory, dict):
             raise ValueError("LOCAL_MEMORY_OBJECT_REQUIRED")
-        from graph_mind.conversation_memory import _forgotten
+        from turnbook.conversation_memory import _forgotten
         if _forgotten(self.db, memory.get("memory_id")):
             return {"memory_id": memory.get("memory_id"), "disposition": "FORGOTTEN"}
         normalized = {
@@ -378,7 +378,7 @@ class LocalBrainStore:
             similar = meaning(query, [m["title"] + "\n" + m["content"] for m in everything]) \
                 if meaning and everything and not selected else None
             if similar:
-                from graph_mind.local_embedder import LOCAL_MODEL
+                from turnbook.local_embedder import LOCAL_MODEL
                 floor = FLOORS.get(LOCAL_MODEL, MEANING_FLOOR)
                 close = sorted(((score, i) for i, score in enumerate(similar)
                                 if score is not None and score >= floor), reverse=True)

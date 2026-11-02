@@ -45,10 +45,10 @@ def packets():
     from semantic_grounding_v073 import LocalEmbedder
     import product_answer_eval as pae
 
-    from graph_mind import inject
-    from graph_mind.context_packet import build_context_pack
-    from graph_mind.local_embedder import LOCAL_MODEL
-    from graph_mind.mcp_server import gather
+    from turnbook import inject
+    from turnbook.context_packet import build_context_pack
+    from turnbook.local_embedder import LOCAL_MODEL
+    from turnbook.mcp_server import gather
     slug = LOCAL_MODEL.replace("/", "_").replace("@", "_")     # full500_mpnet.py's cache
     cache = HERE.parent / "bench/.cache" / f"embed-{slug}.json"
     pae.IDS_FILE = Path("runs/graph-v7.0-full500-30/ids.json")

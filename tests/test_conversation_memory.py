@@ -1,11 +1,11 @@
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import hashlib
 import json
 import tempfile
 import unittest
 
-from graph_mind.conversation_memory import (ClaudeCodeConversationCapture,
+from turnbook.conversation_memory import (ClaudeCodeConversationCapture,
                                             ClaudeCoworkConversationCapture,
                                  CodexConversationCapture,
                                  ConversationMemoryStore, search_terms)
@@ -96,7 +96,7 @@ class ConversationMemoryTests(unittest.TestCase):
         import re
         from unittest import mock
 
-        from graph_mind import conversation_memory
+        from turnbook import conversation_memory
         injected = ["<heartbeat>\n  <automation_id>nightly brief</automation_id>\n</heartbeat>",
                     '<external_codex_apps_open_page>{"page_id":"pagestate"}'
                     "</external_codex_apps_open_page>"]
@@ -332,7 +332,7 @@ class ConversationMemoryTests(unittest.TestCase):
             self.assertEqual(found["turns"][0]["client"], "claude-cowork")
 
     def test_passwords_in_sentences_cards_and_id_numbers_are_masked(self):
-        from graph_mind.conversation_memory import _redact
+        from turnbook.conversation_memory import _redact
         masked = {"my password is Hunter2!xy": "my password is [REDACTED]",
                   "내 비밀번호는 qwer1234! 이야": "내 비밀번호는 [REDACTED] 이야",
                   "와이파이 비번 abcd5678": "와이파이 비번 [REDACTED]",

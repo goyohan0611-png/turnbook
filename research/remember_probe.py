@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / "research"))
 
 from codex_replies import EMPTY, codex  # noqa: E402
 
-from graph_mind.mcp_server import CAPTURED_NOTE  # noqa: E402
+from turnbook.mcp_server import CAPTURED_NOTE  # noqa: E402
 
 NEW_NOTE = (
     "Every turn of this conversation is saved automatically, so do not call brain_remember for "

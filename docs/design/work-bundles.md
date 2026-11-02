@@ -46,7 +46,7 @@ first returns counts and masked previews, the second, with the token the first r
 - **Letta** (Agent File `.af`): a whole agent, memory included, as one portable file. Here: the
   export file below.
 - **MCP Agent Memory**: an automatic backup before clearing, the last 10 kept. Here: `delete`
-  exports first to `~/.graph-mind/backups/`, keeping the last 10.
+  exports first to `~/.turnbook/backups/`, keeping the last 10.
 
 ### Export file
 

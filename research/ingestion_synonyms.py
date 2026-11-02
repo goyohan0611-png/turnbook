@@ -111,7 +111,7 @@ class OpenAIResponsesAliasExtractor:
                 "verbosity": "low",
                 "format": {
                     "type": "json_schema",
-                    "name": "graph_mind_source_aliases",
+                    "name": "turnbook_source_aliases",
                     "strict": True,
                     "schema": ALIAS_SCHEMA,
                 },

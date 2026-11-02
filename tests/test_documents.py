@@ -1,8 +1,8 @@
 import os
 
-from graph_mind import documents
-from graph_mind.context_packet import _conversation_item
-from graph_mind.conversation_memory import ConversationMemoryStore
+from turnbook import documents
+from turnbook.context_packet import _conversation_item
+from turnbook.conversation_memory import ConversationMemoryStore
 
 
 def test_sections_follow_headings():

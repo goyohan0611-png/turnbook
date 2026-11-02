@@ -22,8 +22,8 @@ from pathlib import Path
 
 # Never the developer's own memory: a shared folder in the real config would be synced into every
 # temporary store and its lines would reach the packets sent to the reader.
-os.environ["GRAPH_MIND_HOME"] = tempfile.mkdtemp(prefix="graph-mind-eval-home-")
-for _name in ("GRAPH_MIND_CONFIG", "GRAPH_MIND_FOLDER", "GRAPH_MIND_DB"):
+os.environ["TURNBOOK_HOME"] = tempfile.mkdtemp(prefix="graph-mind-eval-home-")
+for _name in ("TURNBOOK_CONFIG", "TURNBOOK_FOLDER", "TURNBOOK_DB"):
     os.environ.pop(_name, None)
 
 import json                                                  # noqa: E402
@@ -31,7 +31,7 @@ import uuid                                                  # noqa: E402
 
 import longmemeval_retrieval_executor as pipe                # noqa: E402
 import product_answer_eval as pae                            # noqa: E402
-from graph_mind.local_brain import LocalBrainStore, fact_key  # noqa: E402
+from turnbook.local_brain import LocalBrainStore, fact_key  # noqa: E402
 from product_recall_eval import iso                          # noqa: E402
 
 OUT = Path("runs/graph-v9.1-facts-layer")

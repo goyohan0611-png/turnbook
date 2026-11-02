@@ -24,8 +24,8 @@ sys.path.insert(0, str(ROOT / "research"))
 from locomo_pools import CACHE, DATA, conversation, fetch  # noqa: E402
 import numpy as np  # noqa: E402
 
-from graph_mind.local_embedder import LOCAL_MODEL, LocalEmbedder  # noqa: E402
-from graph_mind.mcp_server import RERANK, words_of  # noqa: E402
+from turnbook.local_embedder import LOCAL_MODEL, LocalEmbedder  # noqa: E402
+from turnbook.mcp_server import RERANK, words_of  # noqa: E402
 
 REPO = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
 OUT = ROOT / "research/runs/graph-v9.20-learning/cross_rerank.txt"

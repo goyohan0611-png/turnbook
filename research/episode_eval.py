@@ -28,8 +28,8 @@ import sys
 import tempfile
 
 # Never the developer's own memory: gather() syncs a configured shared folder into every store.
-os.environ["GRAPH_MIND_HOME"] = tempfile.mkdtemp(prefix="graph-mind-eval-home-")
-for _name in ("GRAPH_MIND_CONFIG", "GRAPH_MIND_FOLDER", "GRAPH_MIND_DB"):
+os.environ["TURNBOOK_HOME"] = tempfile.mkdtemp(prefix="graph-mind-eval-home-")
+for _name in ("TURNBOOK_CONFIG", "TURNBOOK_FOLDER", "TURNBOOK_DB"):
     os.environ.pop(_name, None)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,13 +38,13 @@ sys.path.insert(0, str(ROOT / "bench"))
 from evidence import CACHE, DATA, TUNED, fill, iso, report  # noqa: E402
 from longmemeval_m_fetch import stream_instances  # noqa: E402
 
-from graph_mind.context_packet import build_context_pack  # noqa: E402
-from graph_mind.conversation_memory import ConversationMemoryStore  # noqa: E402
-from graph_mind.packing import unpack  # noqa: E402
-from graph_mind.local_embedder import LocalEmbedder  # noqa: E402
-from graph_mind.mcp_server import (_PIECES, CONTEXT_CHARS, CONTEXT_LIMIT, excerpt, gather,  # noqa: E402
+from turnbook.context_packet import build_context_pack  # noqa: E402
+from turnbook.conversation_memory import ConversationMemoryStore  # noqa: E402
+from turnbook.packing import unpack  # noqa: E402
+from turnbook.local_embedder import LocalEmbedder  # noqa: E402
+from turnbook.mcp_server import (_PIECES, CONTEXT_CHARS, CONTEXT_LIMIT, excerpt, gather,  # noqa: E402
                                    semantic_turns)
-from graph_mind.warmup import warm_turns  # noqa: E402
+from turnbook.warmup import warm_turns  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "runs/graph-v9.7-episodes-clean"
 DEPTH = 100

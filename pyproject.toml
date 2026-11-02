@@ -39,30 +39,30 @@ Issues = "https://github.com/goyohan0611-png/turnbook/issues"
 Changelog = "https://github.com/goyohan0611-png/turnbook/blob/main/CHANGELOG.md"
 
 [project.scripts]
-turnbook = "graph_mind.mcp_server:main"
-turnbook-install = "graph_mind.install:main"
-turnbook-uninstall = "graph_mind.install:uninstall"
-turnbook-capture = "graph_mind.capture_cli:main"
-turnbook-forget = "graph_mind.forget:main"
-turnbook-view = "graph_mind.memory_view:main"
-turnbook-hub = "graph_mind.project_brains:hub_main"
+turnbook = "turnbook.mcp_server:main"
+turnbook-install = "turnbook.install:main"
+turnbook-uninstall = "turnbook.install:uninstall"
+turnbook-capture = "turnbook.capture_cli:main"
+turnbook-forget = "turnbook.forget:main"
+turnbook-view = "turnbook.memory_view:main"
+turnbook-hub = "turnbook.project_brains:hub_main"
 # the names before 0.9.44, still in apps' configs, hooks and Startup entries
-graph-mind = "graph_mind.mcp_server:main"
-graph-mind-install = "graph_mind.install:main"
-graph-mind-uninstall = "graph_mind.install:uninstall"
-graph-mind-capture = "graph_mind.capture_cli:main"
-graph-mind-forget = "graph_mind.forget:main"
-graph-mind-view = "graph_mind.memory_view:main"
-graph-mind-hub = "graph_mind.project_brains:hub_main"
+graph-mind = "turnbook.mcp_server:main"
+graph-mind-install = "turnbook.install:main"
+graph-mind-uninstall = "turnbook.install:uninstall"
+graph-mind-capture = "turnbook.capture_cli:main"
+graph-mind-forget = "turnbook.forget:main"
+graph-mind-view = "turnbook.memory_view:main"
+graph-mind-hub = "turnbook.project_brains:hub_main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
-packages = ["graph_mind"]
+packages = ["turnbook"]
 # where apps registered before 0.8 start the server and the capture service (gone in 0.9)
 py-modules = ["graph_mind_mcp_server", "automatic_capture_cli"]
 
 [tool.setuptools.package-data]
-graph_mind = ["opencode_plugin.js"]     # installed into OpenCode by turnbook-install
+turnbook = ["opencode_plugin.js"]     # installed into OpenCode by turnbook-install
 
 [tool.ruff]
 line-length = 100
@@ -74,8 +74,8 @@ select = ["E", "F", "I"]
 
 [tool.ruff.lint.isort]
 from-first = true
-known-first-party = ["graph_mind"]
+known-first-party = ["turnbook"]
 
 [tool.ruff.lint.per-file-ignores]
-"src/graph_mind/memory_view.py" = ["E501"]   # the page's HTML and JavaScript, kept readable as is
+"src/turnbook/memory_view.py" = ["E501"]   # the page's HTML and JavaScript, kept readable as is
 "tests/*" = ["I001"]          # each test imports _isolate first, before anything it isolates

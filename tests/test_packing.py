@@ -4,15 +4,15 @@ The store keeps a turn of 200+ bytes zlib-compressed (about half the size). Word
 turns handed to a model, forgetting, phrase lookup and export must not notice. A store written
 by an older version is upgraded in place and packed later by the capture service.
 """
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import json
 import sqlite3
 import tempfile
 import unittest
 
-from graph_mind import forget, sharing
-from graph_mind.conversation_memory import ConversationMemoryStore
+from turnbook import forget, sharing
+from turnbook.conversation_memory import ConversationMemoryStore
 
 LONG = ("I'm planning the spring offsite. By the way, the venue we picked is Lakeside Lodge, "
         "and the budget owner is Priya from finance. ") * 3
@@ -46,22 +46,22 @@ class PackingTests(unittest.TestCase):
     def test_nothing_is_packed_while_a_process_on_older_code_runs(self):
         """Such a process reads a packed turn as '': forgetting it left its words searchable."""
         from unittest import mock
-        from graph_mind.automatic_capture import AutomaticCaptureService
+        from turnbook.automatic_capture import AutomaticCaptureService
         with tempfile.TemporaryDirectory() as directory:
             db = Path(directory) / "brain.sqlite"
             with ConversationMemoryStore(db) as store:
                 store.record(turn(0, LONG))
             service = AutomaticCaptureService.__new__(AutomaticCaptureService)
             service.db_path, service._packed_upto, service._packed_all = db, 0, False
-            with mock.patch("graph_mind.packing.older_processes", return_value=True):
+            with mock.patch("turnbook.packing.older_processes", return_value=True):
                 self.assertFalse(service.compress_stored())
             with ConversationMemoryStore(db) as store:
                 self.assertFalse(store.packing())
-            with mock.patch("graph_mind.packing.older_processes",
+            with mock.patch("turnbook.packing.older_processes",
                             side_effect=AssertionError("looked again within 10 minutes")):
                 self.assertFalse(service.compress_stored())       # not every 5 s
             service._older_checked -= 601
-            with mock.patch("graph_mind.packing.older_processes", return_value=False):
+            with mock.patch("turnbook.packing.older_processes", return_value=False):
                 self.assertTrue(service.compress_stored())
                 self.assertFalse(service.compress_stored())       # one round, then done
             with ConversationMemoryStore(db) as store:
@@ -131,7 +131,7 @@ class PackingTests(unittest.TestCase):
 
 
     def test_compact_gives_the_freed_space_back_to_the_disk(self):
-        from graph_mind.packing import compact
+        from turnbook.packing import compact
         with tempfile.TemporaryDirectory() as directory:
             db = Path(directory) / "brain.sqlite"
             with ConversationMemoryStore(db) as store:

@@ -1,7 +1,7 @@
 """Project brains on one PC: checkpoints published on request, links to where the work is (a git
 commit at its real stage, a Slack or drive link) and never the files, secrets refused, nothing
 personal let in."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 from unittest import mock
 import base64
@@ -13,7 +13,7 @@ import unittest
 
 from mcp import Client
 
-from graph_mind.project_brains import Ledger
+from turnbook.project_brains import Ledger
 
 KEY = "sk-proj-" + "a" * 40
 
@@ -89,7 +89,7 @@ class LinkTests(unittest.TestCase):
 
 class ScanTests(unittest.TestCase):
     def test_card_numbers_are_found_only_when_they_pass_the_check(self):
-        from graph_mind.project_brains import scan_text
+        from turnbook.project_brains import scan_text
         self.assertEqual(scan_text("card 4111 1111 1111 1111"), ["REDACTED_CARD"])
         self.assertEqual(scan_text("build 4111 1111 1111 1112"), [])
 
@@ -109,9 +109,9 @@ class SealedTests(unittest.TestCase):
 
 class ToolTests(unittest.IsolatedAsyncioTestCase):
     async def test_publish_through_the_assistant_and_personal_memory_stays_out(self):
-        from graph_mind.mcp_server import build_server
+        from turnbook.mcp_server import build_server
         root = Path(tempfile.mkdtemp())
-        with mock.patch.dict(os.environ, {"GRAPH_MIND_CONFIG": str(root / "config.json")}):
+        with mock.patch.dict(os.environ, {"TURNBOOK_CONFIG": str(root / "config.json")}):
             async with Client(build_server(root / "brain.sqlite")) as client:
                 await client.call_tool("brain_remember", {
                     "content": "개인 메모: 연봉 협상 전략", "title": "private",
@@ -135,7 +135,7 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(linked["artifacts"][0]["kind"], "link")
                 timeline = (await call(action="timeline",
                                        project="graph-mind")).structured_content
-        home = Path(os.environ["GRAPH_MIND_HOME"])
+        home = Path(os.environ["TURNBOOK_HOME"])
         dump = "\n".join(sqlite3.connect(home / "ledger.sqlite").iterdump())
         self.assertNotIn("연봉", dump)                 # personal memory never reaches it
         self.assertEqual(len(timeline["checkpoints"]), 2)
@@ -145,12 +145,12 @@ class CodeTests(unittest.IsolatedAsyncioTestCase):
     async def test_any_code_goes_where_it_belongs_whichever_tool_gets_it(self):
         """The user pastes 'a code'; a team invite given to the brain-folder tool joins the team,
         and the user's own-PC code given to the team tool becomes a terminal command."""
-        from graph_mind.mcp_server import build_server
+        from turnbook.mcp_server import build_server
         root = Path(tempfile.mkdtemp())
-        with mock.patch.dict(os.environ, {"GRAPH_MIND_CONFIG": str(root / "config.json")}), \
-                mock.patch("graph_mind.project_brains.join_team",
+        with mock.patch.dict(os.environ, {"TURNBOOK_CONFIG": str(root / "config.json")}), \
+                mock.patch("turnbook.project_brains.join_team",
                            return_value={"joined_as": "민지", "projects": ["p"]}) as team, \
-                mock.patch("graph_mind.sharing.set_folder",
+                mock.patch("turnbook.sharing.set_folder",
                            side_effect=ValueError("INVALID_CONNECTION_CODE")) as own:
             async with Client(build_server(root / "brain.sqlite")) as client:
                 await client.call_tool("brain_checkpoint", {"action": "set_name", "name": "민지"})

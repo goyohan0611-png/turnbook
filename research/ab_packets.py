@@ -26,10 +26,10 @@ from evidence import CACHE, DATA, fill, iso  # noqa: E402
 from longmemeval_m_fetch import stream_instances  # noqa: E402
 from longmemeval_retrieval_executor import asks_assistant_history  # noqa: E402
 
-from graph_mind import conversation_memory, mcp_server  # noqa: E402
-from graph_mind.context_packet import build_context_pack  # noqa: E402
-from graph_mind.local_embedder import LOCAL_MODEL, LocalEmbedder  # noqa: E402
-from graph_mind.warmup import warm_turns  # noqa: E402
+from turnbook import conversation_memory, mcp_server  # noqa: E402
+from turnbook.context_packet import build_context_pack  # noqa: E402
+from turnbook.local_embedder import LOCAL_MODEL, LocalEmbedder  # noqa: E402
+from turnbook.warmup import warm_turns  # noqa: E402
 
 RUN = ROOT / "research/runs/graph-v9.22-ab"
 E5 = "intfloat/multilingual-e5-small@onnx/model.onnx"

@@ -35,7 +35,8 @@ def text_columns(db: sqlite3.Connection) -> str:
     return "content_redacted, content_z" if "content_z" in names else "content_redacted, NULL"
 
 
-MARKS = ("graph_mind", "graph-mind", "turnbook", "automatic_capture_cli")   # how ours start
+# graph_mind, graph-mind: the names before 0.11
+MARKS = ("turnbook", "graph_mind", "graph-mind", "automatic_capture_cli")   # how ours start
 
 
 def older_processes() -> bool:

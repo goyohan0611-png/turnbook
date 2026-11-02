@@ -10,8 +10,8 @@ import re
 import sqlite3
 import unicodedata
 
-from graph_mind.packing import row_text
-from graph_mind.paths import use_wal
+from turnbook.packing import row_text
+from turnbook.paths import use_wal
 
 INDEX_VERSION = "engram-associative-layer-v0.6"
 STOP_TERMS = frozenset({

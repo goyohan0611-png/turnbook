@@ -5,7 +5,7 @@ Same pipeline as every untouched evaluation \u2014 planner, retrieval, extractio
 the pre-registration froze has changed since, because then the result would not be the result of the
 system that was registered.
 
-    OPENAI_API_KEY=... python clean_graph_mind.py
+    OPENAI_API_KEY=... python clean_turnbook.py
 """
 import hashlib
 import json

@@ -13,14 +13,14 @@ import uuid
 
 from pydantic import Field
 
-from graph_mind import __version__
-from graph_mind.associative_memory import AssociativeMemoryIndex
-from graph_mind.coding_memory import CodingMemoryStore
-from graph_mind.context_packet import build_context_pack, decide_recall
-from graph_mind.conversation_memory import ConversationMemoryStore
-from graph_mind.local_brain import LocalBrainStore
-from graph_mind.packing import unpack
-from graph_mind.paths import default_development_db
+from turnbook import __version__
+from turnbook.associative_memory import AssociativeMemoryIndex
+from turnbook.coding_memory import CodingMemoryStore
+from turnbook.context_packet import build_context_pack, decide_recall
+from turnbook.conversation_memory import ConversationMemoryStore
+from turnbook.local_brain import LocalBrainStore
+from turnbook.packing import unpack
+from turnbook.paths import default_development_db
 
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
@@ -31,7 +31,7 @@ SERVER_VERSION = __version__
 # hub over the network whether a newer revision exists, every time it loads. That made the first
 # save of a session take ~95 s and sent requests off the machine for no reason. Once the model is
 # on disk, stay offline.
-from graph_mind.local_embedder import LOCAL_MODEL, model_on_disk  # noqa: E402
+from turnbook.local_embedder import LOCAL_MODEL, model_on_disk  # noqa: E402
 
 if model_on_disk():
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -60,7 +60,7 @@ def index_in_background(database):
                 try:
                     with AssociativeMemoryIndex(database) as index:
                         index.sync_sources(limit=200)
-                    from graph_mind.warmup import warm
+                    from turnbook.warmup import warm
                     warm(database, limit=200, embedder=embedder_for(database))
                 except Exception:               # never lose a save over an index refresh;
                     pass                        # brain_index reports and repairs the backlog
@@ -135,14 +135,14 @@ def local_time(value):
 def configured_db_path():
     """This machine's index. It is never in the shared folder: a SQLite file there would be
     corrupted by the sync client. The shared memory itself is the log (sharing.py)."""
-    configured = os.environ.get("GRAPH_MIND_DB")
+    configured = os.environ.get("TURNBOOK_DB")
     return Path(configured).expanduser() if configured else default_development_db()
 
 
 def shared_sync(database):
     """Pull every device's new log lines into this index before answering. A no-op without a
     shared folder, and cheap when nothing changed (a size check per log file)."""
-    from graph_mind.sharing import folder, sync
+    from turnbook.sharing import folder, sync
     try:
         shared = folder()
         return sync(shared, database) if shared else None
@@ -240,11 +240,11 @@ def trim_if_idle(now=None) -> bool:
         return False
     _PIECES.clear()
     _EMBEDDER.clear()
-    from graph_mind.local_embedder import LocalEmbedder
+    from turnbook.local_embedder import LocalEmbedder
     with LocalEmbedder._lock:
         LocalEmbedder._model = LocalEmbedder._tok = None
         LocalEmbedder._loaded.clear()
-    from graph_mind import sharing
+    from turnbook import sharing
     for url in list(sharing._READERS):       # a hub connection each, held by every old session
         try:
             sharing._READERS.pop(url).close()
@@ -277,7 +277,7 @@ def embedder_for(database):
     _touch()
     key = str(database)
     if key not in _EMBEDDER:
-        from graph_mind.local_embedder import default_embedder
+        from turnbook.local_embedder import default_embedder
         _EMBEDDER[key] = default_embedder(database)
     return _EMBEDDER[key]
 
@@ -316,7 +316,7 @@ class PieceIndex:
         self.norms = np.zeros(0, dtype=np.float64)
 
     def sync(self, database, embedder):
-        from graph_mind.warmup import turn_pieces
+        from turnbook.warmup import turn_pieces
         generation = getattr(embedder.cache, "generation", 0)
         if generation != getattr(self, "generation", generation):
             self.reset()                  # the cache was found wrong and cleared: so are these
@@ -516,7 +516,7 @@ def rerank(query, meaning, words, *, limit, weights=None):
     A weight left out of `weights` is not used."""
     import math
     weights = RERANKS.get(LOCAL_MODEL, RERANK) if weights is None else weights
-    from graph_mind.conversation_memory import search_terms
+    from turnbook.conversation_memory import search_terms
     by_meaning = {t["turn_id"]: (rank, t.get("similarity", 0.0)) for rank, t in enumerate(meaning)}
     by_words = {t["turn_id"]: rank for rank, t in enumerate(words)}
     keep = {}
@@ -648,7 +648,7 @@ def gather(database, query, *, scopes=None, as_of, knowledge_cutoff=None, limit=
     turns = [{k: v for k, v in t.items() if k != "full"} for t in turns
              if not until or t["happened_at"] <= until]
     if any(t["turn_id"].startswith("document-") for t in turns):
-        from graph_mind.documents import replaced_at
+        from turnbook.documents import replaced_at
         with ConversationMemoryStore(database) as conversations:
             old = replaced_at(conversations.db, [t["turn_id"] for t in turns])
         turns = [{**t, "replaced_at": old[t["turn_id"]]} if t["turn_id"] in old else t
@@ -667,7 +667,7 @@ def capture_warnings(now=None) -> list[str]:
     """What the capture service last reported as wrong (a source that stopped yielding turns),
     and the service itself stopped: its last status is old, so nothing new is being saved."""
     try:
-        from graph_mind.automatic_capture import default_service_state_dir
+        from turnbook.automatic_capture import default_service_state_dir
         status = json.loads((default_service_state_dir() / "status.json")
                             .read_text(encoding="utf-8"))
     except Exception:
@@ -770,8 +770,8 @@ def pending_instructions(project) -> Path:
     """New project instructions a chat proposed, waiting for the user to confirm in a terminal."""
     import hashlib
 
-    from graph_mind.paths import graph_mind_home
-    folder = graph_mind_home() / "pending-instructions"
+    from turnbook.paths import turnbook_home
+    folder = turnbook_home() / "pending-instructions"
     folder.mkdir(parents=True, exist_ok=True)
     return folder / (hashlib.sha256(project.encode("utf-8")).hexdigest()[:16] + ".txt")
 
@@ -779,7 +779,7 @@ def pending_instructions(project) -> Path:
 def build_server(db_path=None, terminal=False):
     """`terminal`: the user typed the request in a terminal (turnbook folder ...), so
     brain_folder may change where the memory goes. Apps start the server without it."""
-    # here, not at the top: the SDK takes 6-10 s to import, and graph_mind.inject (run before
+    # here, not at the top: the SDK takes 6-10 s to import, and turnbook.inject (run before
     # every OpenCode message) needs only gather()
     from mcp import types
     from mcp.server import MCPServer
@@ -788,7 +788,7 @@ def build_server(db_path=None, terminal=False):
         "graph-mind-memory",
         title="Turnbook Universal Personal Memory",
         description="User-owned local brain shared across models, sessions and applications.",
-        instructions=instructions(bool(os.environ.get("GRAPH_MIND_CAPTURED"))),
+        instructions=instructions(bool(os.environ.get("TURNBOOK_CAPTURED"))),
         version=SERVER_VERSION,
     )
 
@@ -845,7 +845,7 @@ def build_server(db_path=None, terminal=False):
         """
         # Saving is proactive, so a key the user pastes can arrive here too: mask it with the same
         # rules as captured conversations before it reaches the store or the shared log.
-        from graph_mind.conversation_memory import CREDENTIAL_NAME, _redact
+        from turnbook.conversation_memory import CREDENTIAL_NAME, _redact
 
         def masked(value):          # every text the memory carries, not only content and title
             if isinstance(value, str):
@@ -862,7 +862,7 @@ def build_server(db_path=None, terminal=False):
             [tags, entities, source_ref, attributes, about, attribute])
         known_at = _now()
         if about and attribute:
-            from graph_mind.local_brain import fact_key
+            from turnbook.local_brain import fact_key
             # ponytail: "breed" and "품종" are two facts; names are the model's to keep stable
             attributes = {**(attributes or {}), "fact": fact_key(about, attribute)}
             entities = list(dict.fromkeys([*(entities or []), about]))
@@ -881,7 +881,7 @@ def build_server(db_path=None, terminal=False):
         shared_sync(database)          # a memory being superseded may come from another PC
         with LocalBrainStore(database) as store:
             result = store.remember(memory)
-        from graph_mind.sharing import append, folder
+        from turnbook.sharing import append, folder
         if result.get("disposition") == "RECORDED":       # not a forgotten one, either
             try:
                 shared = folder()
@@ -948,7 +948,7 @@ def build_server(db_path=None, terminal=False):
         if entity or not query:
             import sqlite3
 
-            from graph_mind import entity_timeline as timeline_index
+            from turnbook import entity_timeline as timeline_index
             shared_sync(database)              # every device's memories are in this one index
             db = sqlite3.connect(database)
             try:
@@ -1115,7 +1115,7 @@ def build_server(db_path=None, terminal=False):
                             "command to run in a terminal (PowerShell or Terminal). It prints the "
                             "result there."}
         if export_to or import_from:
-            from graph_mind.sharing import export_file, import_file
+            from turnbook.sharing import export_file, import_file
             result = {}
             if export_to:
                 try:
@@ -1127,12 +1127,12 @@ def build_server(db_path=None, terminal=False):
                 index_in_background(database)
             return result
         if reindex:
-            from graph_mind.warmup import warm
+            from turnbook.warmup import warm
             with AssociativeMemoryIndex(database) as index:
                 synced = index.sync_sources(limit=1000)
             return {"synced": synced, "vectors_warmed": warm(database, limit=1000),
                     "store": str(database)}
-        from graph_mind.sharing import (
+        from turnbook.sharing import (
             device_name,
             devices,
             export_history,
@@ -1159,7 +1159,7 @@ def build_server(db_path=None, terminal=False):
             return {"folder": None, "this_device": device_name(),
                     "note": "No brain folder yet: memory stays on this PC. Ask the user which "
                             "folder to use (a synced one shares it across PCs)."}
-        from graph_mind.sharing import _line_key, _marker, folder_password, is_database
+        from turnbook.sharing import _line_key, _marker, folder_password, is_database
         if not is_database(shared) and _marker(shared).exists() and _line_key(shared) is None:
             return {"folder": str(shared), "this_device": device_name(),
                     "status": "FOLDER_PASSWORD_NEEDED",
@@ -1272,7 +1272,7 @@ def build_server(db_path=None, terminal=False):
         If the result says UNAVAILABLE, the hub cannot be reached: tell the user the latest
         shared state is unknown right now; never fill in from memory.
         """
-        from graph_mind import project_brains as pl
+        from turnbook import project_brains as pl
         if not project and action not in ("projects", "members", "join_team", "audit", "host"):
             project = pl.folder_project(workspace)
         ledger = None
@@ -1423,7 +1423,7 @@ def build_server(db_path=None, terminal=False):
         """
         import sqlite3
 
-        from graph_mind.forget import forget_ids, masked_preview
+        from turnbook.forget import forget_ids, masked_preview
         if ids:
             db = sqlite3.connect(database, timeout=30)
             try:
@@ -1437,7 +1437,7 @@ def build_server(db_path=None, terminal=False):
                 turns, memories = [], []
             finally:
                 db.close()
-            from graph_mind.sharing import folder
+            from turnbook.sharing import folder
             try:
                 shared = folder()
             except Exception:
@@ -1519,10 +1519,10 @@ def preload(database):
 
 
 def keep_capture_running(every=60.0):
-    """An app that relies on the capture service (GRAPH_MIND_CAPTURED, set by the installer)
+    """An app that relies on the capture service (TURNBOOK_CAPTURED, set by the installer)
     keeps it alive: if it died, this server starts it again within a minute."""
     def work():
-        from graph_mind.automatic_capture import ensure_service
+        from turnbook.automatic_capture import ensure_service
         try:
             ensure_service()
         except Exception:                 # never let this take the memory server down
@@ -1530,7 +1530,7 @@ def keep_capture_running(every=60.0):
         timer = threading.Timer(every, work)
         timer.daemon = True
         timer.start()
-    if os.environ.get("GRAPH_MIND_CAPTURED"):
+    if os.environ.get("TURNBOOK_CAPTURED"):
         work()
 
 
@@ -1576,7 +1576,7 @@ def terminal_command(argv):
                             ).add_argument("project")
     args = parser.parse_args(argv)
     if args.command == "model":
-        from graph_mind import local_embedder
+        from turnbook import local_embedder
         if not args.name:
             print(f"Search model: {local_embedder.mode()} ({local_embedder.chosen_model()})\n"
                   "  turnbook model gemma          EmbeddingGemma: most accurate, English and "
@@ -1589,7 +1589,7 @@ def terminal_command(argv):
         print(f"Search model: {local_embedder.PRESETS.get(args.name, args.name)}. Restart your "
               "AI apps; memory is read again with it in the background, at half pace.")
         try:                              # the capture service lends the model: restart it
-            from graph_mind.automatic_capture import ensure_service
+            from turnbook.automatic_capture import ensure_service
             info = json.loads(local_embedder.service_file().read_text(encoding="utf-8"))
             import psutil
             service = psutil.Process(int(info["pid"]))
@@ -1601,7 +1601,7 @@ def terminal_command(argv):
             pass
         return
     if args.command == "docs":
-        from graph_mind import documents
+        from turnbook import documents
         listed = documents.folders()
         if args.action and not args.folder:
             parser.error("docs add/remove needs a FOLDER")
@@ -1624,7 +1624,7 @@ def terminal_command(argv):
     if args.command == "compact":
         import sqlite3
 
-        from graph_mind.packing import compact
+        from turnbook.packing import compact
         try:
             result = compact(configured_db_path())
         except (ValueError, sqlite3.OperationalError) as error:
@@ -1654,7 +1654,7 @@ def terminal_command(argv):
             pending.unlink(missing_ok=True)
         return
     if args.command == "folder" and args.path and args.path not in ("share", "local"):
-        from graph_mind import sharing
+        from turnbook import sharing
         place = Path(args.path).expanduser()
         if (not sharing.is_database(args.path) and not args.path.startswith("gm")
                 and sharing._marker(place).exists()
@@ -1685,7 +1685,7 @@ def terminal_command(argv):
 def main():
     if sys.argv[1:]:
         return terminal_command(sys.argv[1:])
-    from graph_mind.local_embedder import LocalEmbedder
+    from turnbook.local_embedder import LocalEmbedder
     LocalEmbedder.WAIT_FOR_MODEL = 0.5      # an app's question never waits out a model load
     LocalEmbedder.USE_SERVICE = True        # the capture service's model, when it runs
     LocalEmbedder.PACE = True               # a backlog it embeds itself, at half pace

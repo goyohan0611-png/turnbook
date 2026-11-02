@@ -16,7 +16,7 @@ from pathlib import Path
 import sqlite3
 import sys
 
-from graph_mind.packing import text_columns, unpack
+from turnbook.packing import text_columns, unpack
 
 EXCERPT = 500          # semantic_recall embeds text_excerpt = text[:500]
 BATCH = 128
@@ -39,7 +39,7 @@ def pending_texts(db: sqlite3.Connection, embedder, limit: int) -> list[str]:
 
 def warm(db_path, *, limit: int = 500, embedder=None) -> int:
     """Embed everything unembedded in the newest `limit` engrams. Returns how many were added."""
-    from graph_mind.local_embedder import default_embedder
+    from turnbook.local_embedder import default_embedder
 
     embedder = embedder or default_embedder(db_path)
     db = sqlite3.connect(db_path)
@@ -78,7 +78,7 @@ def warm_turns(db_path, *, limit: int = 512, embedder=None) -> int:
     searchable by meaning before anyone asks about them. Without it the first question after a
     busy day met thousands of unembedded pieces, and the server, which never makes a question
     wait for that, answered it from word search alone (79.2% against 86.0% on LongMemEval)."""
-    from graph_mind.local_embedder import default_embedder
+    from turnbook.local_embedder import default_embedder
     embedder = embedder or default_embedder(db_path)
     if hasattr(embedder.cache, "refresh"):
         embedder.cache.refresh()                 # what the memory servers embedded meanwhile
@@ -134,8 +134,8 @@ def warm_turns(db_path, *, limit: int = 512, embedder=None) -> int:
 def _self_check():
     import tempfile
 
-    from graph_mind.associative_memory import AssociativeMemoryIndex
-    from graph_mind.local_brain import LocalBrainStore
+    from turnbook.associative_memory import AssociativeMemoryIndex
+    from turnbook.local_brain import LocalBrainStore
 
     path = Path(tempfile.mkdtemp()) / "brain.sqlite"
     with LocalBrainStore(path) as store:

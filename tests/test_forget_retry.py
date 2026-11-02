@@ -10,10 +10,10 @@ import sys
 import tempfile
 import unittest
 
-from graph_mind import forget as module, sharing
-from graph_mind.conversation_memory import ConversationMemoryStore
-from graph_mind.local_brain import LocalBrainStore
-from graph_mind.semantic_memory import SemanticMemoryIngestion
+from turnbook import forget as module, sharing
+from turnbook.conversation_memory import ConversationMemoryStore
+from turnbook.local_brain import LocalBrainStore
+from turnbook.semantic_memory import SemanticMemoryIngestion
 from test_forget import memory, turn
 
 
@@ -24,8 +24,8 @@ class DurableForgetTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.index, self.peer = self.root / "local.sqlite", self.root / "peer.sqlite"
         self.shared = self.root / "shared"
-        env = mock.patch.dict(os.environ, GRAPH_MIND_HOME=str(self.root / "home"),
-                              GRAPH_MIND_DEVICE="synthetic-desk")
+        env = mock.patch.dict(os.environ, TURNBOOK_HOME=str(self.root / "home"),
+                              TURNBOOK_DEVICE="synthetic-desk")
         env.start()
         self.addCleanup(env.stop)
         sharing._HUB_DOWN.clear()
@@ -61,8 +61,8 @@ class DurableForgetTests(unittest.TestCase):
         status, error = self.worker("""
 import os, sys
 from pathlib import Path
-from graph_mind import sharing
-from graph_mind.forget import forget
+from turnbook import sharing
+from turnbook.forget import forget
 sharing.append = lambda *a, **kw: os._exit(75)
 forget('cobalt', Path(sys.argv[1]), Path(sys.argv[2]))
 """)
@@ -86,7 +86,7 @@ forget('cobalt', Path(sys.argv[1]), Path(sys.argv[2]))
         status, error = self.worker("""
 import os, sys
 from pathlib import Path
-from graph_mind import forget as module
+from turnbook import forget as module
 module.scrub_shared = lambda *a: os._exit(76)
 module.forget('cobalt', Path(sys.argv[1]), Path(sys.argv[2]))
 """)
@@ -212,7 +212,7 @@ module.forget('cobalt', Path(sys.argv[1]), Path(sys.argv[2]))
         self.seed()
         with mock.patch.object(sharing, "append", side_effect=OSError("offline")):
             module.forget("cobalt", self.index, self.shared)
-        with mock.patch("graph_mind.paths.default_development_db", return_value=self.index), \
+        with mock.patch("turnbook.paths.default_development_db", return_value=self.index), \
                 mock.patch("builtins.print"):
             module.main(["cobalt", "--yes"])
         self.assert_propagated()

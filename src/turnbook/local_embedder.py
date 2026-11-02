@@ -14,7 +14,7 @@ import os
 import threading
 import time
 
-from graph_mind.vector_cache import VectorCache, convert
+from turnbook.vector_cache import VectorCache, convert
 
 # "repo@file": an ONNX export on Hugging Face. Two presets
 # (research/runs/graph-v9.21-korean/embed_probe_cross.txt, meaning search, answer in the first 30):
@@ -42,16 +42,16 @@ def prefixes(model):
 
 
 def model_file() -> Path:
-    from graph_mind.paths import graph_mind_home
-    return graph_mind_home() / "model.txt"
+    from turnbook.paths import turnbook_home
+    return turnbook_home() / "model.txt"
 
 
 def chosen_model() -> str:
-    """GRAPH_MIND_MODEL, else ~/.graph-mind/model.txt (`turnbook model`), else: an install that
+    """TURNBOOK_MODEL, else ~/.turnbook/model.txt (`turnbook model`), else: an install that
     already holds the multilingual model's vectors keeps it until the capture service has read
     the memory again with gemma (migrating()), a new one gets gemma. A preset name or
     "repo@onnx/file.onnx"."""
-    name = os.environ.get("GRAPH_MIND_MODEL", "").strip()
+    name = os.environ.get("TURNBOOK_MODEL", "").strip()
     if not name:
         try:
             name = model_file().read_text(encoding="utf-8").strip()
@@ -63,7 +63,7 @@ def chosen_model() -> str:
 def migrating() -> bool:
     """A memory from 0.9.47 or before that nobody pinned to a model: it searches with mpnet
     while the capture service reads it again with gemma, then moves to gemma."""
-    if os.environ.get("GRAPH_MIND_MODEL", "").strip() or model_file().exists():
+    if os.environ.get("TURNBOOK_MODEL", "").strip() or model_file().exists():
         return False
     return existing_memory()
 
@@ -71,8 +71,8 @@ def migrating() -> bool:
 def existing_memory() -> bool:
     """A memory from before the presets (0.9.47 and earlier): it keeps the multilingual model
     until it is read again with gemma, so the update searches as well as before meanwhile."""
-    from graph_mind.paths import graph_mind_home
-    home = graph_mind_home()
+    from turnbook.paths import turnbook_home
+    home = turnbook_home()
     try:
         return (any(home.glob("*.semantic-embed-mpnet8.*"))
                 or (home / "development.sqlite").stat().st_size > 1_000_000)
@@ -105,14 +105,14 @@ def unused_models() -> tuple:
 
 
 def own_hf_home() -> Path:
-    from graph_mind.paths import graph_mind_home
-    return graph_mind_home() / "huggingface"
+    from turnbook.paths import turnbook_home
+    return turnbook_home() / "huggingface"
 
 
 def use_own_hf_home() -> None:
     """Hugging Face keeps everything under HF_HOME (~/.cache/huggingface): the model, its xet
     download cache, its lock files. On one fresh Windows profile that folder could not be created
-    (access denied), so the installer moved all of it under ~/.graph-mind; from then on every
+    (access denied), so the installer moved all of it under ~/.turnbook; from then on every
     process must look there. Read before huggingface_hub is imported, which fixes the paths."""
     if not os.environ.get("HF_HOME") and own_hf_home().is_dir():
         os.environ["HF_HOME"] = str(own_hf_home())
@@ -159,8 +159,8 @@ def _beside(graph, data) -> str:
     hard links when the disk allows (no second copy), else copies."""
     import shutil
 
-    from graph_mind.paths import graph_mind_home
-    folder = graph_mind_home() / "models" / hashlib.sha256(graph.encode()).hexdigest()[:16]
+    from turnbook.paths import turnbook_home
+    folder = turnbook_home() / "models" / hashlib.sha256(graph.encode()).hexdigest()[:16]
     folder.mkdir(parents=True, exist_ok=True)
     name = Path(graph).name
     for source, target in ((graph, folder / name), (data, folder / (name + "_data"))):
@@ -376,8 +376,8 @@ class LocalEmbedder:
 
 
 def service_file() -> Path:
-    from graph_mind.paths import graph_mind_home
-    return graph_mind_home() / "embedder.json"
+    from turnbook.paths import turnbook_home
+    return turnbook_home() / "embedder.json"
 
 
 class _Service:
@@ -460,7 +460,7 @@ def _replace_old_service(info, model) -> bool:
         if "capture_cli" in " ".join(old.cmdline()):
             old.terminate()
             old.wait(15)
-        from graph_mind.automatic_capture import ensure_service
+        from turnbook.automatic_capture import ensure_service
         ensure_service()
         return True
     except Exception:                 # gone already, or not ours: the next try looks again
@@ -470,11 +470,11 @@ def _replace_old_service(info, model) -> bool:
 def serve(embedder, context=None) -> None:
     """Lend this process's model to the memory servers on this PC (the capture service calls it).
     `context(message) -> str`: also answer ("context", message) with the memory for it, from
-    this process's warm index (graph_mind.inject: the per-message hook, ~0.1 s instead of the
+    this process's warm index (turnbook.inject: the per-message hook, ~0.1 s instead of the
     1-2 s a fresh process takes to import and read the index).
 
     Local only: 127.0.0.1, and a client must prove it read the key in the user's own
-    ~/.graph-mind/embedder.json. Texts come in, vectors go out; nothing is stored here."""
+    ~/.turnbook/embedder.json. Texts come in, vectors go out; nothing is stored here."""
     from multiprocessing.connection import Listener, answer_challenge, deliver_challenge
     key = os.urandom(32)
     # no authkey here: the Listener checks it inside accept(), in the one accepting thread, so a

@@ -13,7 +13,7 @@ import sys
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "src"))
-from graph_mind import mcp_server  # noqa: E402
+from turnbook import mcp_server  # noqa: E402
 
 mcp_server.rerank = lambda query, meaning, words, *, limit, weights=None: mcp_server.fuse(
     meaning, words, limit=limit)

@@ -1,13 +1,13 @@
 """Codex round 10 sharing findings: a replaced log, a large backlog, a forgotten predecessor,
 a hub left unscrubbed, and plain lines on a sealed hub."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 from unittest import mock
 import os
 import tempfile
 import unittest
 
-from graph_mind import sharing
+from turnbook import sharing
 
 
 def memory(mid, text, supersedes=None):
@@ -22,10 +22,10 @@ class SyncTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(tempfile.mkdtemp())
         self.shared, self.index = self.root / "shared", self.root / "index.sqlite"
-        os.environ["GRAPH_MIND_DEVICE"] = "desk"
+        os.environ["TURNBOOK_DEVICE"] = "desk"
 
     def tearDown(self):
-        os.environ.pop("GRAPH_MIND_DEVICE", None)
+        os.environ.pop("TURNBOOK_DEVICE", None)
 
     def test_a_replaced_log_of_the_same_length_is_read_again(self):
         sharing.append(self.shared, "memory", memory("m1", "aaaa"))
@@ -56,7 +56,7 @@ class SyncTests(unittest.TestCase):
             "scope": "global", "role": "user", "content_redacted": "비밀 이야기",
             "raw_sha256": "x", "source_path": "p", "happened_at": "2026-03-01T09:00:00",
             "known_at": "2026-03-01T09:00:00", "source_ordinal": 1})
-        os.environ["GRAPH_MIND_DEVICE"] = "laptop"   # forgot it while the folder was away
+        os.environ["TURNBOOK_DEVICE"] = "laptop"   # forgot it while the folder was away
         sharing.append(self.shared, "forget", {"turn_ids": ["t1"], "memory_ids": []})
         sharing.sync(self.shared, self.index)
         self.assertNotIn("비밀", (self.shared / "log" / "desk.jsonl").read_text(encoding="utf-8"))

@@ -1,7 +1,7 @@
 """Faults that must heal without the user: a hub process that died, a capture service that died,
 an embedding model that will not run. bench/recovery.py runs these with the other fault tests and
 reports them together."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 from unittest import mock
 import os
@@ -11,10 +11,10 @@ import tempfile
 import time
 import unittest
 
-from graph_mind import automatic_capture
-from graph_mind import mcp_server as server
-from graph_mind import sharing
-from graph_mind.conversation_memory import ConversationMemoryStore
+from turnbook import automatic_capture
+from turnbook import mcp_server as server
+from turnbook import sharing
+from turnbook.conversation_memory import ConversationMemoryStore
 
 
 class HubProcessDiedTests(unittest.TestCase):
@@ -32,7 +32,7 @@ class HubProcessDiedTests(unittest.TestCase):
         with socket.socket() as probe:
             probe.bind(("127.0.0.1", 0))
             port = probe.getsockname()[1]
-        with mock.patch.dict(os.environ, {"GRAPH_MIND_HOME": str(home)}), \
+        with mock.patch.dict(os.environ, {"TURNBOOK_HOME": str(home)}), \
                 mock.patch.object(sharing, "PORT", port):
             try:
                 with psycopg.connect(sharing.local_postgres(), autocommit=True) as db:

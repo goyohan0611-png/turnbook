@@ -19,7 +19,7 @@ import learning_curve as lc  # noqa: E402
 import numpy as np  # noqa: E402
 import rerank_v2 as v2  # noqa: E402
 
-from graph_mind.mcp_server import RERANK, rerank  # noqa: E402
+from turnbook.mcp_server import RERANK, rerank  # noqa: E402
 
 PRODUCT_NAME = {"meaning": "rrf_meaning", "words": "rrf_words"}
 

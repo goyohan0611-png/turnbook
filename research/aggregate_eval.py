@@ -18,15 +18,15 @@ import json
 import re
 import tempfile
 
-import episode_eval  # noqa: F401  (first: isolates GRAPH_MIND_HOME, sets up the paths)
+import episode_eval  # noqa: F401  (first: isolates TURNBOOK_HOME, sets up the paths)
 
 from evidence import CACHE, DATA, fill, iso  # noqa: E402
 from longmemeval_m_fetch import stream_instances  # noqa: E402
 
-from graph_mind.context_packet import build_context_pack  # noqa: E402
-from graph_mind.local_embedder import LocalEmbedder  # noqa: E402
-from graph_mind.mcp_server import _PIECES, CONTEXT_CHARS, CONTEXT_LIMIT, gather  # noqa: E402
-from graph_mind.warmup import warm_turns  # noqa: E402
+from turnbook.context_packet import build_context_pack  # noqa: E402
+from turnbook.local_embedder import LocalEmbedder  # noqa: E402
+from turnbook.mcp_server import _PIECES, CONTEXT_CHARS, CONTEXT_LIMIT, gather  # noqa: E402
+from turnbook.warmup import warm_turns  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "runs/graph-v9.10-aggregate"
 AGGREGATE = re.compile(r"\b(how many|how much|total|in all|altogether|combined|sum of)\b", re.I)

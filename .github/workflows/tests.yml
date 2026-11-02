@@ -41,6 +41,6 @@ jobs:
         run: python -m unittest discover -s research/tests -p "test_*.py"
       - name: Self-checks
         run: |
-          python -m graph_mind.vector_cache
-          python -m graph_mind.sharing
-          python -m graph_mind.warmup
+          python -m turnbook.vector_cache
+          python -m turnbook.sharing
+          python -m turnbook.warmup

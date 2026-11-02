@@ -96,7 +96,7 @@ def _self_check():
     from pathlib import Path
     import tempfile
 
-    from graph_mind.local_brain import LocalBrainStore
+    from turnbook.local_brain import LocalBrainStore
 
     path = Path(tempfile.mkdtemp()) / "brain.sqlite"
     facts = [("JWT expiry set to 24h", ["auth module"], "2026-03-12T09:00:00", None),

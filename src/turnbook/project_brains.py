@@ -297,7 +297,7 @@ def _now() -> str:
 
 def named() -> bool:
     """Whether this person chose the name others see (else it is this PC's name)."""
-    from graph_mind.sharing import _config
+    from turnbook.sharing import _config
     return bool(_config().get("user_name"))
 
 
@@ -305,7 +305,7 @@ def set_display_name(name: str) -> dict:
     """The name others see on checkpoints and member lists, instead of this PC's name:
     kept on this PC and set on the account of every hub this person is in (their own and each
     team hub), so all their PCs and teammates show it. Names are unique per hub."""
-    from graph_mind import sharing
+    from turnbook import sharing
     name = " ".join(str(name or "").split())
     if not name or len(name) > 40:
         raise ValueError("NAME: 1 to 40 characters, as teammates should see it (e.g. 고요한)")
@@ -334,13 +334,13 @@ def set_display_name(name: str) -> dict:
 def actor() -> str:
     """Who this person is on their own ledger: config "user_name", else this PC's name. On a
     team hub it is the name in their invite (Ledger.by)."""
-    from graph_mind.sharing import _config, device_name
+    from turnbook.sharing import _config, device_name
     return _config().get("user_name") or device_name()
 
 
 def _home() -> Path:
-    from graph_mind.paths import graph_mind_home
-    return graph_mind_home()
+    from turnbook.paths import turnbook_home
+    return turnbook_home()
 
 
 class Ledger:
@@ -777,7 +777,7 @@ def _clean_context(context) -> dict:
 def scan_text(text: str) -> list[str]:
     """Kinds of secrets in the text: the masking rules capture uses, applied whatever the
     user's mask_secrets setting (that setting is about this PC; this is about sharing)."""
-    from graph_mind.conversation_memory import RANDOM_CANDIDATE, SECRET_PATTERNS, _looks_random
+    from turnbook.conversation_memory import RANDOM_CANDIDATE, SECRET_PATTERNS, _looks_random
     found = []
     for pattern, replacement in SECRET_PATTERNS:
         if callable(replacement):        # a check (card numbers: Luhn) decides per match
@@ -847,7 +847,7 @@ def _decode_team(code: str) -> dict:
 def _admin(database=HUB_DATABASE):
     import psycopg
 
-    from graph_mind import sharing
+    from turnbook import sharing
     return psycopg.connect(sharing._admin_uri(database), autocommit=True)
 
 
@@ -857,7 +857,7 @@ _PREPARED = set()
 def prepare_hub(owner_url=None) -> None:
     """On the PC hosting a hub: its database, functions and project template, and the team
     group. Idempotent; done once per process (sharing.local_postgres calls it)."""
-    from graph_mind import sharing
+    from turnbook import sharing
     owner_url = owner_url or sharing.local_postgres()
     # each home has its own cluster: a hub prepared for one home is not prepared for another
     key = (owner_url, str(_home()))
@@ -924,7 +924,7 @@ def _prepare(owner_url) -> None:
     _migrate_shared_tables()
     # a hub already open to the network (shared before, or teammates in it): the person's other
     # PCs and the teammates reach the hub database, and nobody but the owner the memory one
-    from graph_mind import sharing
+    from turnbook import sharing
     rules = (sharing._pg_data() / "pg_hba.conf").read_text(encoding="utf-8")
     if "graphmind graphmind all scram-sha-256" in rules and \
             f"hostssl {HUB_DATABASE} +{TEAM_GROUP} all" not in rules:
@@ -939,7 +939,7 @@ def _migrate_shared_tables() -> dict:
     every project has moved. (Stored files and reviews belonged to a feature since removed.)"""
     from cryptography.fernet import Fernet
 
-    from graph_mind import sharing
+    from turnbook import sharing
     with _admin("graphmind") as old:
         if not old.execute("SELECT to_regclass('public.ledger_projects')").fetchone()[0]:
             return {}
@@ -1015,7 +1015,7 @@ def _migrate_shared_tables() -> dict:
 
 def secure_hub() -> None:
     """prepare_hub, and let the team group in from the network: to the hub database only."""
-    from graph_mind import sharing
+    from turnbook import sharing
     prepare_hub()
     sharing.allow_from_network(f"{HUB_DATABASE} +{TEAM_GROUP}", "teammates, project brains")
     sharing.forbid_from_network(f"graphmind +{TEAM_GROUP}")
@@ -1025,7 +1025,7 @@ def host_projects() -> dict:
     """Make this PC's hub the home of this person's project brains (a NAS or an always-on PC
     can do it without holding anyone's personal memory). Projects kept on this PC alone so far
     move into it."""
-    from graph_mind import sharing
+    from turnbook import sharing
     opened = sharing.open_to_network()
     sharing._save({"hosts_projects": True})
     prepare_hub()
@@ -1034,7 +1034,7 @@ def host_projects() -> dict:
 
 
 def _move_local_projects() -> dict:
-    """Projects from ~/.graph-mind/ledger.sqlite into the hub, keeping ids and times."""
+    """Projects from ~/.turnbook/ledger.sqlite into the hub, keeping ids and times."""
     path = _home() / "ledger.sqlite"
     if not path.exists():
         return {"projects": 0, "checkpoints": 0}
@@ -1073,7 +1073,7 @@ def add_account(member: str, by: str = "hub operator", *, reset: bool = False) -
     existing account keeps its code unless `reset` (a lost code): a new code ends the old one."""
     import secrets
 
-    from graph_mind import sharing
+    from turnbook import sharing
     member = str(member or "").strip()
     if not member or len(member) > 60:
         raise ValueError("MEMBER_NAME: the person's name, as others will see it")
@@ -1228,7 +1228,7 @@ def join_team(code: str, name: str | None = None) -> dict:
     """On a teammate's PC: add a team hub to the ones it takes part in, shown there as `name`
     (else the name the invite gave). It changes nothing about this PC's personal memory or
     where that memory syncs: no conversation is sent anywhere."""
-    from graph_mind import sharing
+    from turnbook import sharing
     value = _decode_team(code)
     key = (tuple(value["h"]), value["p"], value["u"])
     hubs = [c for c in sharing._config().get("team_hubs", [])
@@ -1250,7 +1250,7 @@ def join_team(code: str, name: str | None = None) -> dict:
 
 def leave_team(project: str) -> dict:
     """Stop using the team hub that holds `project` on this PC."""
-    from graph_mind import sharing
+    from turnbook import sharing
     hubs = sharing._config().get("team_hubs", [])
     for code in hubs:
         ledger = _team_ledger(code)
@@ -1267,7 +1267,7 @@ def _team_url(value: dict) -> str:
     import socket
     import urllib.parse
 
-    from graph_mind import sharing
+    from turnbook import sharing
     host = value["h"][0] if value["h"] else "127.0.0.1"
     for candidate in value["h"]:
         try:
@@ -1288,7 +1288,7 @@ class HubUnavailable(Exception):
 def _team_ledger(code: str) -> Ledger:
     import psycopg
 
-    from graph_mind import sharing
+    from turnbook import sharing
     value = _decode_team(code)
     host = value["h"][0] if value["h"] else "?"
     try:
@@ -1303,17 +1303,17 @@ def _team_ledger(code: str) -> Ledger:
 
 
 def _hosts_here() -> bool:
-    from graph_mind import sharing
+    from turnbook import sharing
     settings = sharing._config()
     return bool(settings.get("hosts_projects")) or settings.get("memory_folder") == "local"
 
 
 def own_ledger() -> Ledger:
     """This person's own project brains: on the hub this PC hosts or the person's memory uses,
-    else on this PC alone (~/.graph-mind/ledger.sqlite)."""
+    else on this PC alone (~/.turnbook/ledger.sqlite)."""
     import psycopg
 
-    from graph_mind import sharing
+    from turnbook import sharing
     settings = sharing._config()
     url = None
     if settings.get("hosts_projects"):
@@ -1343,7 +1343,7 @@ def own_ledger() -> Ledger:
 def home_ledger(hub: str | None = None) -> Ledger:
     """Where a new project goes: the person's own hub, or this PC alone, unless they work only
     on team hubs (a company server): then the team hub, or the one `hub` names."""
-    from graph_mind import sharing
+    from turnbook import sharing
     settings = sharing._config()
     codes = settings.get("team_hubs", [])
     own = settings.get("hosts_projects") or sharing.is_database(sharing.folder())
@@ -1359,7 +1359,7 @@ def home_ledger(hub: str | None = None) -> Ledger:
 
 def ledgers() -> tuple[list[Ledger], list[str]]:
     """Every project brain this person takes part in, and the hubs that cannot be reached."""
-    from graph_mind.sharing import _config
+    from turnbook.sharing import _config
     found, unreachable = [], []
     try:
         found.append(own_ledger())
@@ -1394,7 +1394,7 @@ def ledger_for(project: str) -> Ledger:
 def folder_project(cwd=None) -> str | None:
     """The project this working folder is bound to (config project_folders), if any: the
     default when the user says "공유해" without naming one. Sharing still needs the request."""
-    from graph_mind.sharing import _config
+    from turnbook.sharing import _config
     here = Path(cwd or os.getcwd()).resolve()
     best = None
     for folder_path, project in _config().get("project_folders", {}).items():
@@ -1406,7 +1406,7 @@ def folder_project(cwd=None) -> str | None:
 
 
 def bind_folder(folder_path, project) -> dict:
-    from graph_mind.sharing import _config, _save
+    from turnbook.sharing import _config, _save
     bound = dict(_config().get("project_folders", {}))
     resolved = str(Path(folder_path).expanduser().resolve())
     bound[resolved] = _project_name(project)

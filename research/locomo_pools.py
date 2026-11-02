@@ -26,11 +26,11 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from graph_mind.conversation_memory import ConversationMemoryStore  # noqa: E402
-from graph_mind.local_embedder import PRESETS, LocalEmbedder  # noqa: E402
+from turnbook.conversation_memory import ConversationMemoryStore  # noqa: E402
+from turnbook.local_embedder import PRESETS, LocalEmbedder  # noqa: E402
 LOCAL_MODEL = PRESETS["multilingual"]   # the pools' default: files without a model suffix
-from graph_mind.mcp_server import _PIECES, CONTEXT_LIMIT, excerpt, fuse, semantic_turns  # noqa: E402
-from graph_mind.warmup import warm_turns  # noqa: E402
+from turnbook.mcp_server import _PIECES, CONTEXT_LIMIT, excerpt, fuse, semantic_turns  # noqa: E402
+from turnbook.warmup import warm_turns  # noqa: E402
 
 DATA = ROOT / "research/external/locomo/locomo10.json"
 URL = "https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json"

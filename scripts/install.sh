@@ -5,7 +5,7 @@
 #
 # It installs uv (Astral's installer, to your home folder, no sudo), which brings its own
 # Python 3.12; installs Turnbook with it; then connects your AI apps (turnbook-install).
-# Arguments go to turnbook-install (... | sh -s -- --name "Your Name"). GRAPH_MIND_VERSION pins one.
+# Arguments go to turnbook-install (... | sh -s -- --name "Your Name"). TURNBOOK_VERSION pins one.
 set -eu
 
 if ! command -v uv >/dev/null 2>&1; then
@@ -15,7 +15,8 @@ if ! command -v uv >/dev/null 2>&1; then
     export PATH
 fi
 
-SPEC="turnbook${GRAPH_MIND_VERSION:+==$GRAPH_MIND_VERSION}"
+PIN="${TURNBOOK_VERSION:-${GRAPH_MIND_VERSION:-}}"     # GRAPH_MIND_VERSION: the old name
+SPEC="turnbook${PIN:+==$PIN}"
 # the name before 0.9.44: its commands would clash with these; the memory itself is kept
 uv tool list 2>/dev/null | grep -q "^graph-mind-memory " && uv tool uninstall graph-mind-memory >/dev/null
 echo "Turnbook: installing $SPEC..."

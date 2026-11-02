@@ -4,7 +4,7 @@ A database file in a synced folder breaks: OneDrive and Dropbox copy files, they
 machines' writes. So the memory itself is kept as plain append-only text in the shared folder, and
 every machine builds its own SQLite index from it:
 
-    <GRAPH_MIND_FOLDER>/log/
+    <TURNBOOK_FOLDER>/log/
       desktop.jsonl        <- only the desktop ever appends here
       laptop.jsonl         <- only the laptop ever appends here
 
@@ -40,14 +40,14 @@ import sqlite3
 import subprocess
 import time
 
-from graph_mind.packing import row_text
+from turnbook.packing import row_text
 
 KINDS = ("memory", "turn", "forget")   # forget: ids another PC erased (forget.py)
 
 
 def device_name() -> str:
-    """This machine's name. GRAPH_MIND_DEVICE overrides it (tests, two accounts on one PC)."""
-    raw = os.environ.get("GRAPH_MIND_DEVICE") or platform.node() or "device"
+    """This machine's name. TURNBOOK_DEVICE overrides it (tests, two accounts on one PC)."""
+    raw = os.environ.get("TURNBOOK_DEVICE") or platform.node() or "device"
     return re.sub(r"[^a-z0-9]+", "-", raw.casefold()).strip("-") or "device"
 
 
@@ -55,7 +55,7 @@ def log_name() -> str:
     """This install's log file in the brain folder: the machine's name and a suffix drawn once.
     Two PCs named alike (DESKTOP-1, user-pc) appended to one file, and the sync client kept one
     PC's copy of it: the other's memories were lost."""
-    if os.environ.get("GRAPH_MIND_DEVICE"):
+    if os.environ.get("TURNBOOK_DEVICE"):
         return device_name()
     name = _config().get("log_name")
     if not name:
@@ -73,11 +73,11 @@ def log_name() -> str:
 
 def config_path() -> Path:
     """Where the chosen brain folder is remembered for every client on this machine."""
-    override = os.environ.get("GRAPH_MIND_CONFIG")
+    override = os.environ.get("TURNBOOK_CONFIG")
     if override:
         return Path(override)
-    from graph_mind.paths import graph_mind_home
-    return graph_mind_home() / "config.json"            # ~/.graph-mind unless GRAPH_MIND_HOME
+    from turnbook.paths import turnbook_home
+    return turnbook_home() / "config.json"            # ~/.turnbook unless TURNBOOK_HOME
 
 
 def _config() -> dict:
@@ -93,14 +93,14 @@ def is_database(shared) -> bool:
 
 _LOCAL_URI = {}
 _JOINED = {}
-PORT = int(os.environ.get("GRAPH_MIND_PG_PORT", "54329"))   # fixed: a connection code stays valid
+PORT = int(os.environ.get("TURNBOOK_PG_PORT", "54329"))   # fixed: a connection code stays valid
 CODE_PREFIX = "gm1."
 TAILSCALE = "100.64.0.0/10"
 
 
 def _pg_data() -> Path:
-    from graph_mind.paths import graph_mind_home
-    data = graph_mind_home() / "postgres"
+    from turnbook.paths import turnbook_home
+    data = turnbook_home() / "postgres"
     # this PC's own logins read their passwords here (libpq's password file): in no URL, so
     # never shown or saved anywhere else
     os.environ["PGPASSFILE"] = str(data.parent / "pgpass")
@@ -192,7 +192,7 @@ def local_postgres() -> str:
     # project brains' tables and file functions, once per process: a teammate or the owner's
     # other PC may use them without this PC ever opening a project itself
     try:
-        from graph_mind.project_brains import prepare_hub
+        from turnbook.project_brains import prepare_hub
         prepare_hub(_LOCAL_URI["uri"])
     except Exception:
         pass                                  # the personal memory works without them
@@ -233,7 +233,7 @@ def postgres_bin() -> Path:
                            "supported yet (Windows, macOS, and Linux on x86-64 or 64-bit ARM "
                            "are). Joining a hub another machine hosts works here.")
     from platformdirs import user_cache_dir
-    cache = Path(os.environ.get("GRAPH_MIND_RUNTIME")
+    cache = Path(os.environ.get("TURNBOOK_RUNTIME")
                  or user_cache_dir("graph-mind", appauthor=False))
     root = cache / f"postgresql-{POSTGRES}"
     linux = platform.system() == "Linux"
@@ -551,9 +551,9 @@ def tls_options(certificate: str | None) -> str:
     import ssl
     import urllib.parse
 
-    from graph_mind.paths import graph_mind_home
+    from turnbook.paths import turnbook_home
     der = base64.urlsafe_b64decode(certificate + "=" * (-len(certificate) % 4))
-    path = graph_mind_home() / "hubs" / f"{hashlib.sha256(der).hexdigest()[:16]}.crt"
+    path = turnbook_home() / "hubs" / f"{hashlib.sha256(der).hexdigest()[:16]}.crt"
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(ssl.DER_cert_to_PEM_cert(der), encoding="ascii")
@@ -637,10 +637,10 @@ def _joined(code: str) -> str:
 
 
 def folder():
-    """Where the shared brain lives: a folder (Path), or a Postgres URL (str). GRAPH_MIND_FOLDER
+    """Where the shared brain lives: a folder (Path), or a Postgres URL (str). TURNBOOK_FOLDER
     if set, otherwise the one chosen in conversation; "local" means this PC's own Postgres and a
     connection code means another PC's."""
-    value = os.environ.get("GRAPH_MIND_FOLDER") or _config().get("memory_folder")
+    value = os.environ.get("TURNBOOK_FOLDER") or _config().get("memory_folder")
     if not value:
         return None
     if value == "local":
@@ -1168,8 +1168,8 @@ _HUB_DOWN: dict = {}
 
 
 def _outbox() -> Path:
-    from graph_mind.paths import graph_mind_home
-    return graph_mind_home() / "outbox.jsonl"
+    from turnbook.paths import turnbook_home
+    return turnbook_home() / "outbox.jsonl"
 
 
 def _append_or_queue(url, send, lines) -> int:
@@ -1297,7 +1297,7 @@ def _new_lines(db: sqlite3.Connection, shared) -> tuple[list[str], list[tuple], 
 def sync(shared: Path, index: Path) -> dict:
     """Bring this machine's index up to date with every device's log, a batch at a time: the
     whole unread history read at once ran a fresh PC out of memory before anything landed."""
-    from graph_mind.forget import retry_deletions
+    from turnbook.forget import retry_deletions
     retry_deletions(index, wait=True)
     total = {"imported": 0, "conflicts": 0, "waiting": 0}
     while True:
@@ -1339,8 +1339,8 @@ def _land(items, brain, turns):
 
 
 def _sync_batch(shared: Path, index: Path) -> tuple[dict, bool]:
-    from graph_mind.conversation_memory import ConversationMemoryStore
-    from graph_mind.local_brain import LocalBrainStore
+    from turnbook.conversation_memory import ConversationMemoryStore
+    from turnbook.local_brain import LocalBrainStore
 
     db = _cursor_db(index)
     try:
@@ -1367,7 +1367,7 @@ def _sync_batch(shared: Path, index: Path) -> tuple[dict, bool]:
         with LocalBrainStore(index) as brain, ConversationMemoryStore(index) as turns:
             imported, conflicts, waiting = _land(items, brain, turns)
             if forgets:                     # after the imports: a forgotten turn may be in them
-                from graph_mind.forget import forget_ids, scrub_shared
+                from turnbook.forget import forget_ids, scrub_shared
                 for record in forgets:      # here too: this PC's outbox and staged lines
                     forget_ids(record, index)
                 try:
@@ -1401,8 +1401,8 @@ def _self_check():
     root = Path(tempfile.mkdtemp())
     shared, desk_index, lap_index = root / "OneDrive" / "Graph-MIND", root / "desk.sqlite", \
         root / "lap.sqlite"
-    from graph_mind.conversation_memory import ConversationMemoryStore
-    from graph_mind.local_brain import LocalBrainStore
+    from turnbook.conversation_memory import ConversationMemoryStore
+    from turnbook.local_brain import LocalBrainStore
 
     def memory(mid, text, when, supersedes=None):
         return {"memory_id": mid, "scope": "global", "memory_type": "fact", "title": text,
@@ -1411,14 +1411,14 @@ def _self_check():
                 "provenance": {"source_type": "test", "source_ref": "self-check"},
                 "supersedes_memory_id": supersedes}
 
-    os.environ["GRAPH_MIND_DEVICE"] = "desktop"
+    os.environ["TURNBOOK_DEVICE"] = "desktop"
     append(shared, "memory", memory("m1", "사는 곳: 서울", "2026-03-01T09:00:00"))
     append(shared, "turn", {"turn_id": "t1", "client": "claude-code", "client_session_id": "s",
                             "scope": "global", "role": "user",
                             "content_redacted": "콩이를 제주도에 데려갔어", "raw_sha256": "x",
                             "source_path": "p", "happened_at": "2026-03-01T09:00:00",
                             "known_at": "2026-03-01T09:00:00", "source_ordinal": 1})
-    os.environ["GRAPH_MIND_DEVICE"] = "laptop"
+    os.environ["TURNBOOK_DEVICE"] = "laptop"
     # the laptop has not seen the desktop yet, so this lands in its log first in file order
     append(shared, "memory", memory("m2", "사는 곳: 부산", "2026-10-01T09:00:00", supersedes="m1"))
 
@@ -1438,7 +1438,7 @@ def _self_check():
     assert sync(shared, lap_index)["imported"] == 3, "the torn line is not read"
     assert sync(shared, lap_index)["conflicts"] == 0
 
-    os.environ.pop("GRAPH_MIND_DEVICE")
+    os.environ.pop("TURNBOOK_DEVICE")
     print("sharing self-check ok")
 
 

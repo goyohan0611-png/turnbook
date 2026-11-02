@@ -13,9 +13,9 @@ import hashlib
 import re
 import sqlite3
 
-from graph_mind.local_brain import LocalBrainStore
-from graph_mind.packing import row_text
-from graph_mind.paths import use_wal
+from turnbook.local_brain import LocalBrainStore
+from turnbook.packing import row_text
+from turnbook.paths import use_wal
 
 GATE_VERSION = "semantic-memory-gate-v0.3.1"
 PREFERENCE = re.compile(r"(?:선호|좋아(?:해|한다|함)|싫어(?:해|한다|함)|원해|원한다|했으면)")
@@ -171,7 +171,7 @@ def drop_keyword_memories(path) -> int:
     """Once per store: erase the decisions, preferences and project principles the gate made.
     The turns they were copied from stay; memories made because the user said "기억해" stay too,
     since that was the user's own request."""
-    from graph_mind.forget import erase
+    from turnbook.forget import erase
     db = sqlite3.connect(str(path), timeout=30)
     try:
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master")}

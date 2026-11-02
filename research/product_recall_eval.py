@@ -24,10 +24,10 @@ from pathlib import Path
 import json
 import tempfile
 
-from graph_mind.conversation_memory import ConversationMemoryStore
-from graph_mind.mcp_server import DEFAULT_CONTEXT_POLICY, gather
+from turnbook.conversation_memory import ConversationMemoryStore
+from turnbook.mcp_server import DEFAULT_CONTEXT_POLICY, gather
 from longmemeval_m_fetch import stream_instances
-from graph_mind.context_packet import build_context_pack, decide_recall
+from turnbook.context_packet import build_context_pack, decide_recall
 
 DATA = Path("external/longmemeval/longmemeval_s_cleaned.json")
 IDS = Path("runs/graph-v3.2-untouched-eval-v2/preregistration.json")       # dev2, as elsewhere

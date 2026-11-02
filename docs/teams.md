@@ -51,4 +51,4 @@ turnbook-hub delete-project NAME --confirm NAME
 turnbook-hub audit
 ```
 
-**On this PC alone**: without a hub, projects stay in `~/.graph-mind/ledger.sqlite`.
+**On this PC alone**: without a hub, projects stay in `~/.turnbook/ledger.sqlite`.

@@ -1,15 +1,15 @@
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import tempfile
 import unittest
 
 from mcp import Client
 
-from graph_mind.associative_memory import AssociativeMemoryIndex
-from graph_mind.coding_memory import CodingMemoryStore
-from graph_mind.conversation_memory import ConversationMemoryStore
-from graph_mind.mcp_server import build_server
-from graph_mind.local_brain import LocalBrainStore
+from turnbook.associative_memory import AssociativeMemoryIndex
+from turnbook.coding_memory import CodingMemoryStore
+from turnbook.conversation_memory import ConversationMemoryStore
+from turnbook.mcp_server import build_server
+from turnbook.local_brain import LocalBrainStore
 
 
 T1 = "2026-01-01T10:00:00"

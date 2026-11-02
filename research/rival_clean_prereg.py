@@ -102,7 +102,7 @@ def freeze():
         "type_mix": {t: sum(1 for q in chosen if rows[q]["question_type"] == t)
                      for t in sorted(by_type)},
         "systems": {
-            "graph_mind": {"reader": "gpt-5-mini", "extraction": "gpt-5-mini, effort=low",
+            "turnbook": {"reader": "gpt-5-mini", "extraction": "gpt-5-mini, effort=low",
                            "retrieval_k": "max(16, ceil(1.5*sqrt(sessions)))",
                            "packet": "20 spans x 500 chars", "gate": "off"},
             "mem0": {"version": "2.2.1", "model": "gpt-4o-mini",
@@ -122,7 +122,7 @@ def freeze():
                               "Graph-MIND extracts in this harness (only the retrieved sessions)"},
             "mempalace": {"version": "3.10.0", "deviations": [],
                           "input": "the FULL haystack"},
-            "graph_mind_product": {
+            "turnbook_product": {
                 "what": "the recall path the MCP server ships (brain_context), not the benchmark "
                         "pipeline: no write-time LLM; the haystack stored as captured turns",
                 "retrieval": "USER turns cut into 500-char pieces ranked by local embeddings, fused "

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import math
 
-from graph_mind.clock import timestamp  # noqa: F401  (re-exported for the research modules)
+from turnbook.clock import timestamp  # noqa: F401  (re-exported for the research modules)
 from executable_memory import TypedMemoryIndex
 from memory_contract import strict_object
 from state_relation_contract import SINGLE_STATE_RELATIONS, VERSION as STATE_CONTRACT_VERSION, single_state_relation

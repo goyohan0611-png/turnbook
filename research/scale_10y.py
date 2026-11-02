@@ -29,10 +29,10 @@ from evidence import iso  # noqa: E402
 from locomo_pools import CACHE, DATA, evidence_ids, fetch, turns_of  # noqa: E402
 from longmemeval_m_fetch import stream_instances  # noqa: E402
 
-from graph_mind import mcp_server  # noqa: E402
-from graph_mind.conversation_memory import ConversationMemoryStore  # noqa: E402
-from graph_mind.local_embedder import LOCAL_MODEL, LocalEmbedder  # noqa: E402
-from graph_mind.warmup import warm_turns  # noqa: E402
+from turnbook import mcp_server  # noqa: E402
+from turnbook.conversation_memory import ConversationMemoryStore  # noqa: E402
+from turnbook.local_embedder import LOCAL_MODEL, LocalEmbedder  # noqa: E402
+from turnbook.warmup import warm_turns  # noqa: E402
 
 SIZES = [0, 50_000, 150_000, 400_000]          # other turns added beside LoCoMo's 5,882
 if "--big" in sys.argv:                         # only the large sizes, the best arms (time)

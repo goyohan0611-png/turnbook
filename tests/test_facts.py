@@ -4,15 +4,15 @@ The model records a fact with `about` and `attribute`; a later value of the same
 the earlier one in recall without the model knowing the earlier memory's id, and the order is
 when each became true, so a fact recorded late from an old conversation stays history.
 """
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import tempfile
 import unittest
 
 from mcp import Client
 
-from graph_mind.local_brain import LocalBrainStore
-from graph_mind.mcp_server import build_server, wait_for_index
+from turnbook.local_brain import LocalBrainStore
+from turnbook.mcp_server import build_server, wait_for_index
 
 
 class FactTests(unittest.IsolatedAsyncioTestCase):

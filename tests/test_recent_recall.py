@@ -7,16 +7,16 @@ question, whether the item that actually answers it reaches the top three of the
 
     python -m unittest test_recent_recall -v     # also prints the before/after table
 """
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import tempfile
 import unittest
 
 from mcp import Client
 
-from graph_mind.conversation_memory import ConversationMemoryStore
-from graph_mind.mcp_server import build_server, wait_for_index
-from graph_mind.local_brain import LocalBrainStore
+from turnbook.conversation_memory import ConversationMemoryStore
+from turnbook.mcp_server import build_server, wait_for_index
+from turnbook.local_brain import LocalBrainStore
 
 NOW = "2026-10-06T10:00:00"
 
@@ -115,7 +115,7 @@ class UntilTests(unittest.TestCase):
     def test_a_later_turn_does_not_crowd_out_the_past(self):
         """until was applied after the limit: the newest turn took the one slot, then went."""
         import tempfile
-        from graph_mind.conversation_memory import ConversationMemoryStore
+        from turnbook.conversation_memory import ConversationMemoryStore
         with tempfile.TemporaryDirectory() as directory:
             with ConversationMemoryStore(Path(directory) / "b.sqlite") as store:
                 for n, day in ((1, "2026-01-05"), (2, "2026-03-05")):

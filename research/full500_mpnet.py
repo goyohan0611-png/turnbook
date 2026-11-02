@@ -22,7 +22,7 @@ ARM = "".join(f"-{a}" for a in sys.argv[1:2])
 WORK = CACHE / f"full500-mpnet8{ARM}"                # kept between CI runs
 os.chdir(HERE)
 sys.path.insert(0, str(HERE.parent / "src"))
-from graph_mind.local_embedder import LOCAL_MODEL  # noqa: E402
+from turnbook.local_embedder import LOCAL_MODEL  # noqa: E402
 
 slug = LOCAL_MODEL.replace("/", "_").replace("@", "_")   # bench/evidence.py's cache for it
 sys.argv = [sys.argv[0], "spans", "--out", str(WORK), "--writable",

@@ -28,8 +28,8 @@ import tempfile
 from pathlib import Path
 
 import longmemeval_retrieval_executor as pipe
-from graph_mind.entity_timeline import entities, normalize, rebuild, timeline
-from graph_mind.local_brain import LocalBrainStore
+from turnbook.entity_timeline import entities, normalize, rebuild, timeline
+from turnbook.local_brain import LocalBrainStore
 from longmemeval_adapter import parse_date
 
 RUN = Path("runs/graph-v5.6-effort-low")

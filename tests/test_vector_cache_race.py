@@ -15,7 +15,7 @@ import tempfile
 import threading
 import unittest
 
-MODULE = Path(__file__).resolve().parent.parent / "src/graph_mind/vector_cache.py"
+MODULE = Path(__file__).resolve().parent.parent / "src/turnbook/vector_cache.py"
 
 
 def load(path):
@@ -73,9 +73,9 @@ class VectorCacheRaceTests(unittest.TestCase):
 class RepairTests(unittest.TestCase):
     def test_a_cache_holding_wrong_vectors_is_found_and_refilled(self):
         import _isolate  # noqa: F401
-        from graph_mind.conversation_memory import ConversationMemoryStore
-        from graph_mind.local_embedder import LocalEmbedder
-        from graph_mind import warmup
+        from turnbook.conversation_memory import ConversationMemoryStore
+        from turnbook.local_embedder import LocalEmbedder
+        from turnbook import warmup
         with tempfile.TemporaryDirectory() as directory:
             store = Path(directory) / "m.sqlite"
             with ConversationMemoryStore(store) as turns:
@@ -104,8 +104,8 @@ class RepairTests(unittest.TestCase):
 class QueryTests(unittest.TestCase):
     def test_a_question_is_answered_without_staying_in_the_cache(self):
         from unittest import mock
-        from graph_mind import local_embedder
-        from graph_mind.local_embedder import LocalEmbedder
+        from turnbook import local_embedder
+        from turnbook.local_embedder import LocalEmbedder
         with tempfile.TemporaryDirectory() as directory:
             embedder = LocalEmbedder(Path(directory) / "cache.json")
             vector = [0.6, 0.8]
@@ -117,7 +117,7 @@ class QueryTests(unittest.TestCase):
                 self.assertEqual(len(embedder.cache), 1)
 
     def test_the_service_is_asked_a_question_only_in_the_form_it_knows(self):
-        from graph_mind import local_embedder
+        from turnbook import local_embedder
         sent = []
         conn = type("C", (), {"send": lambda self, x: sent.append(x),
                               "poll": lambda self, t: True, "recv": lambda self: [[1.0]]})()
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         target = sys.argv[1]
         if target.startswith("git:"):
             import subprocess
-            source = subprocess.run(["git", "show", target[4:] + ":src/graph_mind/vector_cache.py"],
+            source = subprocess.run(["git", "show", target[4:] + ":src/turnbook/vector_cache.py"],
                                     capture_output=True, text=True, check=True,
                                     cwd=MODULE.parent).stdout
             target = Path(tempfile.mkdtemp()) / "vector_cache.py"

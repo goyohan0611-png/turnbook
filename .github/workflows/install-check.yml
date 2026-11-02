@@ -78,14 +78,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       PYTHONUTF8: "1"
-      GRAPH_MIND_RELEASE: ${{ inputs.version || github.event.workflow_run.head_branch }}
+      TURNBOOK_RELEASE: ${{ inputs.version || github.event.workflow_run.head_branch }}
     steps:
       - uses: actions/checkout@v4
       - name: scripts/install.ps1
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $env:GRAPH_MIND_VERSION = $env:GRAPH_MIND_RELEASE.TrimStart('v')
+          $env:TURNBOOK_VERSION = $env:TURNBOOK_RELEASE.TrimStart('v')
           $env:UV_NO_CACHE = "1"
           # right after a release the index may not list it yet: try again, as a user would
           foreach ($i in 1..10) {
@@ -98,7 +98,7 @@ jobs:
         run: |
           # right after a release the index may not list it yet: try again, as a user would
           for i in 1 2 3 4 5 6 7 8 9 10; do
-            GRAPH_MIND_VERSION="${GRAPH_MIND_RELEASE#v}" UV_NO_CACHE=1 sh scripts/install.sh --no-start && break
+            TURNBOOK_VERSION="${TURNBOOK_RELEASE#v}" UV_NO_CACHE=1 sh scripts/install.sh --no-start && break
             [ "$i" = 10 ] && exit 1
             sleep 30
           done
@@ -148,7 +148,7 @@ jobs:
       - name: Server works
         run: python .github/smoke_install.py
       - name: Embedding runs (ONNX Runtime on this OS and Python)
-        run: python -c "from graph_mind.local_embedder import LocalEmbedder; import tempfile, os; e = LocalEmbedder(os.path.join(tempfile.mkdtemp(), 'c.json')); v = e.embed(['memory test'])[0]; assert len(v) == 768, len(v); print('embedding ok', len(v))"
+        run: python -c "from turnbook.local_embedder import LocalEmbedder; import tempfile, os; e = LocalEmbedder(os.path.join(tempfile.mkdtemp(), 'c.json')); v = e.embed(['memory test'])[0]; assert len(v) == 768, len(v); print('embedding ok', len(v))"
       - name: Forget command runs
         run: turnbook-forget "no-such-phrase-anywhere" --yes
       - name: Uninstall leaves no app registration behind

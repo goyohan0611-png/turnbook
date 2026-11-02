@@ -1,34 +1,31 @@
-"""Turnbook: local memory for AI assistants, shared over MCP.
-
-Capture saves every conversation on this PC without calling a model; recall hands the model
-the few thousand tokens of the past that answer its question.
-"""
-from pathlib import Path
-import os
-import re
-
-# Before numpy is imported anywhere: OpenBLAS reserves a buffer per core when it loads, 233 MB
-# of memory on an 8-core PC, in every memory server an app starts. One thread is plenty for the
-# one query-against-pieces product per question this package asks of it.
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+"""The package's name before 0.11: apps, hooks and Startup entries written by older installers run
+`python -m graph_mind.mcp_server`, `graph_mind.hook`, `graph_mind.capture_cli`... Every
+`graph_mind.X` is `turnbook.X`, the same module object, so those keep working until
+`turnbook-install` rewrites them."""
+import importlib
+import importlib.abc
+import importlib.util
+import sys
 
 
-def _version() -> str:
-    """The checkout's pyproject.toml, else the installed distribution's version: a hand-kept
-    constant once drifted to 0.5.0 at release 0.3.1."""
-    project = Path(__file__).resolve().parents[2] / "pyproject.toml"
-    text = project.read_text(encoding="utf-8") if project.exists() else ""
-    if 'name = "turnbook"' in text:
-        found = re.search(r'^version = "([^"]+)"', text, re.M)
-        if found:
-            return found.group(1)
-    from importlib.metadata import version
-    for name in ("turnbook", "graph-mind-memory"):      # graph-mind-memory: up to 0.9.43
-        try:
-            return version(name)
-        except Exception:
-            pass
-    return "0+unknown"
+class _Alias(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+    def find_spec(self, name, path=None, target=None):
+        if not name.startswith(__name__ + "."):
+            return None
+        real = importlib.util.find_spec("turnbook" + name[len(__name__):])
+        if real is None:
+            return None
+        if sys.argv and sys.argv[0] == "-m" and real.origin:
+            # `python -m graph_mind.X`: turnbook/X.py run as __main__ (its loader is named
+            # turnbook.X and refuses another name, so a loader for the file under this one)
+            return importlib.util.spec_from_file_location(name, real.origin)
+        return importlib.util.spec_from_loader(name, self)
+
+    def create_module(self, spec):
+        return importlib.import_module("turnbook" + spec.name[len(__name__):])
+
+    def exec_module(self, module):
+        pass
 
 
-__version__ = _version()
+sys.meta_path.insert(0, _Alias())

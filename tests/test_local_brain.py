@@ -1,4 +1,4 @@
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from contextlib import closing
 from pathlib import Path
 import json
@@ -6,7 +6,7 @@ import sqlite3
 import tempfile
 import unittest
 
-from graph_mind.local_brain import LocalBrainStore
+from turnbook.local_brain import LocalBrainStore
 
 
 T1 = "2026-09-15T10:00:00"

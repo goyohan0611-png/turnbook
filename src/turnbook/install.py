@@ -31,22 +31,23 @@ if __package__ in (None, ""):                # run as a file from a checkout: im
 
 def module(name):
     """`python -m name`, minus the current folder on Python 3.10, which ignores PYTHONSAFEPATH:
-    apps start us inside the user's project, and a graph_mind/ there would run instead."""
+    apps start us inside the user's project, and a turnbook/ there would run instead."""
     if sys.version_info >= (3, 11):
         return ["-m", name]
     return ["-c", "import sys; sys.path[:] = [p for p in sys.path if p]; import runpy; "
                   f"runpy.run_module('{name}', run_name='__main__')"]
 
 
-SERVER = module("graph_mind.mcp_server")
-CAPTURE = ["-m", "graph_mind.capture_cli", "run"]
-NAME = "graph-mind-memory"
+SERVER = module("turnbook.mcp_server")
+CAPTURE = ["-m", "turnbook.capture_cli", "run"]
+NAME = "turnbook"
+OLD_NAMES = ("graph-mind-memory",)        # the server's name in apps' configs before 0.11
 # PYTHONSAFEPATH (3.11+): apps start the server in the user's project folder, and `python -m`
-# looks there first; a graph_mind.py or graph_mind/ in that project replaced the real package
+# looks there first; a turnbook.py or turnbook/ in that project replaced the real package
 ENV = {"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8", "PYTHONSAFEPATH": "1"}
 # apps whose transcripts the capture service reads: every turn is saved without the model,
 # so the model need not spend a tool call on brain_remember for ordinary chat
-CAPTURED = {**ENV, "GRAPH_MIND_CAPTURED": "1"}
+CAPTURED = {**ENV, "TURNBOOK_CAPTURED": "1"}
 
 
 # what one app's settings can throw at us (not JSON, an unexpected shape, a file the app holds
@@ -75,10 +76,12 @@ def _json_entry(path: Path, key: str = "mcpServers", env=ENV, **extra) -> None:
     settings = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     servers = settings.setdefault(key, {})
     environment = {**servers.get(NAME, {}).get("env", {}), **env}   # keep the user's own settings
-    if "GRAPH_MIND_CAPTURED" not in env:     # ours to set: a stale one told the model not to save
-        environment.pop("GRAPH_MIND_CAPTURED", None)
+    if "TURNBOOK_CAPTURED" not in env:     # ours to set: a stale one told the model not to save
+        environment.pop("TURNBOOK_CAPTURED", None)
+    for old in OLD_NAMES:
+        environment = {**servers.pop(old, {}).get("env", {}), **environment}
     servers[NAME] = {**extra, "command": sys.executable, "args": SERVER, "env": environment}
-    temporary = path.with_suffix(".graph-mind.tmp")
+    temporary = path.with_suffix(".turnbook.tmp")
     temporary.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(temporary, path)
 
@@ -88,7 +91,8 @@ def claude_code(home: Path) -> str:
     if claude:                           # Windows will not launch by its bare name
         environment = [flag for key, value in CAPTURED.items() for flag in ("-e", f"{key}={value}")]
         try:
-            subprocess.run([claude, "mcp", "remove", "-s", "user", NAME], capture_output=True)
+            for name in (NAME, *OLD_NAMES):
+                subprocess.run([claude, "mcp", "remove", "-s", "user", name], capture_output=True)
             # the name before -e: the CLI's -e takes every value that follows, the name included
             subprocess.run([claude, "mcp", "add", "-s", "user", NAME, *environment, "--",
                             sys.executable, *SERVER], check=True, capture_output=True)
@@ -188,7 +192,7 @@ def _hook_command(agent: str, event: str) -> str:
     """Gemini CLI runs a hook through PowerShell on Windows and sh elsewhere. In PowerShell a
     quoted path is a string, not a command, so it needs the call operator; a profile folder with
     a space ("C:\\Users\\Jane Doe") made the plain quoted form fail without a word."""
-    arguments = [*module("graph_mind.hook"), agent, event]
+    arguments = [*module("turnbook.hook"), agent, event]
     if os.name == "nt":                # single quotes: literal in PowerShell, '' escapes one
         rest = " ".join(a if a.replace("-", "").replace(".", "").replace("_", "").isalnum()
                         else "'" + a.replace("'", "''") + "'" for a in arguments)
@@ -208,27 +212,28 @@ def _plain_command(agent: str, event: str) -> str:
         if ctypes.windll.kernel32.GetShortPathNameW(python, buffer, 1024):
             python = buffer.value
     # -P: not the user's project folder first (PYTHONSAFEPATH; these hooks pass no env).
-    # ponytail: 3.10 has no -P, so a graph_mind/ in the project could shadow ours there
-    arguments = ["-P"] * (sys.version_info >= (3, 11)) + ["-m", "graph_mind.hook"]
+    # ponytail: 3.10 has no -P, so a turnbook/ in the project could shadow ours there
+    arguments = ["-P"] * (sys.version_info >= (3, 11)) + ["-m", "turnbook.hook"]
     if os.name == "nt":
         return " ".join([python.replace("\\", "/"), *arguments, agent, event])
     return shlex.join([python, *arguments, agent, event])
 
 
 def _ours(entry) -> bool:
-    return "graph_mind.hook" in json.dumps(entry)
+    text = json.dumps(entry)
+    return "turnbook.hook" in text or "graph_mind.hook" in text      # graph_mind: before 0.11
 
 
 def _hook_files(home: Path) -> list:
     """(app, folder, hooks file, {event: entry}) for agents whose hooks save the conversation."""
     gemini = {event: {"matcher": matcher, "hooks": [{
-        "type": "command", "name": "graph-mind", "timeout": 20000, "env": ENV,
+        "type": "command", "name": "turnbook", "timeout": 20000, "env": ENV,
         "command": _hook_command("gemini-cli", event)}]}
         # AfterTool only for brain_forget: the conversation about deleting is not kept
         for event, matcher in (("BeforeAgent", "*"), ("AfterAgent", "*"),
                                ("AfterTool", "brain_forget"))}
     # the others' conversations are read from their transcripts: these hooks only add the
-    # memory for each message (graph_mind.hook.INJECT_ONLY)
+    # memory for each message (turnbook.hook.INJECT_ONLY)
     def prompt(agent):
         return {"UserPromptSubmit": {"hooks": [{
             "type": "command", "timeout": 20,
@@ -262,14 +267,14 @@ def _write_hooks(path: Path, entries: dict) -> None:
     for event, entry in entries.items():
         hooks.setdefault(event, []).append(entry)
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".graph-mind.tmp")
+    temporary = path.with_suffix(".turnbook.tmp")
     temporary.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(temporary, path)
 
 
 def agent_hooks(home: Path, remove: bool = False) -> list[str]:
     """Gemini CLI keeps no transcript we read: its hooks hand each
-    message to graph_mind.hook, which saves it for the capture service (and, in Gemini CLI,
+    message to turnbook.hook, which saves it for the capture service (and, in Gemini CLI,
     adds the memory before the model answers)."""
     done = []
     for name, folder, path, entries in _hook_files(home):
@@ -304,24 +309,29 @@ def opencode(home: Path) -> str:
     except ValueError:                       # comments in the .jsonc: leave the file alone
         step(f"OpenCode: could not edit {config}; add the server there by hand")
         return ""
-    from graph_mind.mcp_server import instructions
-    guide = folder / "graph-mind.md"
+    from turnbook.mcp_server import instructions
+    for old in ("graph-mind.md", "plugins/graph-mind.js"):          # their names before 0.11
+        (folder / old).unlink(missing_ok=True)
+    guide = folder / "turnbook.md"
     guide.write_text("# Turnbook memory\n\n" + instructions(True) + "\n", encoding="utf-8")
-    from graph_mind.conversation_memory import opencode_root
+    from turnbook.conversation_memory import opencode_root
     plugin = (HERE / "opencode_plugin.js").read_text(encoding="utf-8")
     plugin = plugin.replace("__PYTHON__", json.dumps(sys.executable)).replace(
         "__TRANSCRIPTS__", json.dumps(str(opencode_root())))
     (folder / "plugins").mkdir(exist_ok=True)
-    (folder / "plugins" / "graph-mind.js").write_text(plugin, encoding="utf-8")
+    (folder / "plugins" / "turnbook.js").write_text(plugin, encoding="utf-8")
     settings.setdefault("$schema", "https://opencode.ai/config.json")
     servers = settings.setdefault("mcp", {})
+    for old in OLD_NAMES:
+        servers.pop(old, None)
     servers[NAME] = {"type": "local", "command": [sys.executable, *SERVER], "enabled": True,
                      "timeout": 30000,
                      "environment": {**servers.get(NAME, {}).get("environment", {}), **CAPTURED}}
     listed = settings.setdefault("instructions", [])
+    listed[:] = [item for item in listed if not str(item).endswith("graph-mind.md")]
     if str(guide) not in listed:
         listed.append(str(guide))
-    temporary = config.with_suffix(".graph-mind.tmp")
+    temporary = config.with_suffix(".turnbook.tmp")
     temporary.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(temporary, config)
     return "OpenCode"
@@ -357,7 +367,8 @@ def _without_codex_block(text: str) -> str:
     """The Codex config without Turnbook's server table (and its env table); the rest kept.
     The table may be written [mcp_servers."graph-mind-memory"] too (TOML allows quoted keys):
     left in place, the table added after it made the file invalid (duplicate table)."""
-    ours = (("mcp_servers", NAME), ("mcp_servers", NAME, "env"))
+    ours = {("mcp_servers", name, *rest) for name in (NAME, *OLD_NAMES)
+            for rest in ((), ("env",))}
     kept, skipping, dropped = [], False, False
     for line in text.splitlines():
         if line.strip().startswith("["):
@@ -376,11 +387,21 @@ def _login_item() -> Path:
     system = platform.system()
     if system == "Windows":
         return (Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
-                / "Startup" / "Graph-MIND Automatic Capture.lnk")
+                / "Startup" / "Turnbook.lnk")
     if system == "Darwin":
-        return Path.home() / "Library" / "LaunchAgents" / "com.graph-mind.capture.plist"
+        return Path.home() / "Library" / "LaunchAgents" / "com.turnbook.capture.plist"
     config = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
     return config / "autostart" / "turnbook-capture.desktop"
+
+
+def _old_login_items() -> list:
+    """The login items' names before 0.11."""
+    system = platform.system()
+    if system == "Windows":
+        return [_login_item().with_name("Graph-MIND Automatic Capture.lnk")]
+    if system == "Darwin":
+        return [_login_item().with_name("com.graph-mind.capture.plist")]
+    return []
 
 
 def codex(home: Path) -> str:
@@ -401,7 +422,7 @@ def codex(home: Path) -> str:
 
 
 def capture_service(start: bool) -> str:
-    from graph_mind.automatic_capture import (
+    from turnbook.automatic_capture import (
         _atomic_json,
         default_config_path,
         make_config,
@@ -425,13 +446,19 @@ def capture_service(start: bool) -> str:
                     f"$s.WorkingDirectory={ps(Path.home())};$s.Save()")
         subprocess.run(["powershell", "-NoProfile", "-Command", shortcut], check=True,
                        capture_output=True)
+        for old in _old_login_items():          # the shortcut's name before 0.11
+            old.unlink(missing_ok=True)
     elif system == "Darwin":
         import plistlib
         python = Path(sys.executable)
         agent = _login_item()
         agent.parent.mkdir(parents=True, exist_ok=True)
+        for old in _old_login_items():          # the agent's name before 0.11
+            if old.exists():
+                subprocess.run(["launchctl", "unload", str(old)], capture_output=True)
+                old.unlink()
         agent.write_bytes(plistlib.dumps({
-            "Label": "com.graph-mind.capture", "RunAtLoad": True,
+            "Label": "com.turnbook.capture", "RunAtLoad": True,
             "WorkingDirectory": str(Path.home()), "ProgramArguments": [str(python), *CAPTURE]}))
     else:                                       # Linux desktops: XDG autostart
         python = Path(sys.executable)
@@ -441,13 +468,13 @@ def capture_service(start: bool) -> str:
                          f"Exec=\"{python}\" {' '.join(CAPTURE)}\nPath={Path.home()}\n"
                          "X-GNOME-Autostart-enabled=true\n", encoding="utf-8")
     if start:
-        from graph_mind.automatic_capture import ensure_service
+        from turnbook.automatic_capture import ensure_service
         ensure_service()
     return "capture service starts at login"
 
 
 def embedding_model():
-    from graph_mind.local_embedder import chosen_model, model_files, model_paths, own_hf_home
+    from turnbook.local_embedder import chosen_model, model_files, model_paths, own_hf_home
     try:
         import onnxruntime  # noqa: F401  (a DLL failure here would leave search on words only)
     except ImportError as error:
@@ -460,7 +487,7 @@ def embedding_model():
     try:
         model_paths(chosen_model())
     except OSError as error:
-        # ~/.cache refused (access denied): move Hugging Face's whole home under ~/.graph-mind,
+        # ~/.cache refused (access denied): move Hugging Face's whole home under ~/.turnbook,
         # where every Turnbook process looks from now on (local_embedder.use_own_hf_home)
         denied = (isinstance(error, PermissionError) or isinstance(error.__cause__, PermissionError)
                   or "PermissionError" in str(error))
@@ -489,8 +516,8 @@ def remove_old_models():
     from huggingface_hub import scan_cache_dir
     from huggingface_hub.constants import HF_HUB_CACHE
 
-    from graph_mind.local_embedder import PRESETS, own_hf_home, unused_models
-    from graph_mind.paths import graph_mind_home
+    from turnbook.local_embedder import PRESETS, own_hf_home, unused_models
+    from turnbook.paths import turnbook_home
     unused = unused_models()
     for cache in {Path(HF_HUB_CACHE), own_hf_home() / "hub"}:
         try:
@@ -503,8 +530,8 @@ def remove_old_models():
             pass
     if PRESETS["multilingual"].split("@")[0] in unused:
         # mpnet's vectors ("mpnet8") and the ones before the per-model names ("cache")
-        for stale in [*graph_mind_home().glob("*.semantic-embed-mpnet8.*"),
-                      *graph_mind_home().glob("*.semantic-embed-cache.*")]:
+        for stale in [*turnbook_home().glob("*.semantic-embed-mpnet8.*"),
+                      *turnbook_home().glob("*.semantic-embed-cache.*")]:
             try:
                 shutil.rmtree(stale) if stale.is_dir() else stale.unlink()
             except OSError:
@@ -518,7 +545,7 @@ CHANGES = """Turnbook will change these settings on this PC (turnbook-uninstall 
     Gemini CLI, Copilot CLI) and a plugin for OpenCode
   - start its capture service at login (it reads those apps' conversation files on this PC)
   - download the search model (about 290 MB, once)
-Nothing is sent anywhere; the memory stays in ~/.graph-mind."""
+Nothing is sent anywhere; the memory stays in ~/.turnbook."""
 
 
 def main(argv=None):
@@ -535,16 +562,17 @@ def main(argv=None):
         sys.exit("Turnbook needs Python 3.10 or newer.")
     if args.join:                            # a typo in the code should fail before anything else
         if args.join.strip().startswith("gmt1."):
-            from graph_mind.project_brains import _decode_team
+            from turnbook.project_brains import _decode_team
             _decode_team(args.join)
         else:
-            from graph_mind.sharing import _decode
+            from turnbook.sharing import _decode
             _decode(args.join)
     if not args.yes and sys.stdin is not None and sys.stdin.isatty():
         print(CHANGES)
         if input("Go ahead? [Y/n] ").strip().lower() not in ("", "y", "yes"):
             print("Nothing was changed.")
             return 0
+    _move_memory()
     if not args.skip_packages and (CHECKOUT / "pyproject.toml").exists():   # pip: already done
         step("installing packages (the first time takes a few minutes)")
         packages()
@@ -568,25 +596,63 @@ def main(argv=None):
         step("Codex asks once before it runs a new hook: type /hooks in Codex and trust "
              "Turnbook's")
     if args.name:
-        from graph_mind.sharing import _save
+        from turnbook.sharing import _save
         _save({"user_name": " ".join(args.name.split())[:40]})
         step(f"teammates will see you as {args.name}")
     step(capture_service(start=not args.no_start))
     if not args.skip_model:
-        from graph_mind.local_embedder import mode
+        from turnbook.local_embedder import mode
         step(f"downloading the search model: {mode()}")
         embedding_model()
     if args.join and args.join.strip().startswith("gmt1."):
-        from graph_mind.project_brains import join_team
+        from turnbook.project_brains import join_team
         joined = join_team(args.join.strip(), args.name)
         projects = ", ".join(joined["projects"]) or "no projects yet"
         step(f"joined the team as {joined['joined_as']}: {projects}")
     elif args.join:
-        from graph_mind.sharing import folder, set_folder
+        from turnbook.sharing import folder, set_folder
         set_folder(args.join)
         where = folder().rsplit("@", 1)[1].split("/")[0]
         step(f"joined the shared brain at {where}")
     print("\nDone. Restart your AI apps so they load the memory.")
+
+
+def _stop_service() -> bool:
+    from turnbook.automatic_capture import default_service_state_dir
+    try:
+        import psutil
+        service = psutil.Process(int((default_service_state_dir() / "service.pid")
+                                     .read_text(encoding="ascii")))
+        if "capture_cli" in " ".join(service.cmdline()):
+            service.terminate()
+            service.wait(10)
+            return True
+    except Exception:                            # no pid file, not running, or already gone
+        pass
+    return False
+
+
+def _move_memory() -> None:
+    """A memory from before 0.11 in ~/.graph-mind: moved to ~/.turnbook with the capture service
+    and this PC's hub stopped. An app still holding a file keeps it where it is, and it moves
+    at the next login, when the capture service starts before the apps."""
+    from turnbook.paths import move_old_home
+    old = Path.home() / ".graph-mind"
+    if (os.environ.get("TURNBOOK_HOME") or not old.is_dir()
+            or (Path.home() / ".turnbook").exists()):
+        return
+    _stop_service()
+    if (old / "postgres" / "postmaster.pid").exists():
+        try:
+            from turnbook import sharing
+            sharing.stop_postgres(old / "postgres")
+        except Exception:
+            pass
+    if move_old_home():
+        step("memory moved to ~/.turnbook")
+    else:
+        step("memory stays in ~/.graph-mind for now (an app has it open); it moves to "
+             "~/.turnbook by itself at the next login")
 
 
 def uninstall(argv=None):
@@ -594,14 +660,15 @@ def uninstall(argv=None):
     service. The memory itself stays unless --purge, so reinstalling picks up where it was."""
     parser = argparse.ArgumentParser(description="Remove Turnbook from this PC's AI apps.")
     parser.add_argument("--purge", action="store_true",
-                        help="also delete this PC's memory (~/.graph-mind); cannot be undone")
+                        help="also delete this PC's memory (~/.turnbook); cannot be undone")
     parser.add_argument("--yes", action="store_true", help="do not ask before --purge")
     args = parser.parse_args(argv)
     home, removed = Path.home(), []
     claude = shutil.which("claude")
     if claude:
         try:
-            subprocess.run([claude, "mcp", "remove", "-s", "user", NAME], capture_output=True)
+            for name in (NAME, *OLD_NAMES):
+                subprocess.run([claude, "mcp", "remove", "-s", "user", name], capture_output=True)
         except OSError:                  # blocked by antivirus or policy: remove the rest anyway
             pass
     targets = ([("Claude Code", home / ".claude.json", "mcpServers")]
@@ -617,22 +684,26 @@ def uninstall(argv=None):
             settings = json.loads(config.read_text(encoding="utf-8"))
         except ValueError:
             continue
-        if settings.get(key, {}).pop(NAME, None) is not None:
-            guide = str(_opencode_dir(home) / "graph-mind.md")
-            if guide in settings.get("instructions", []):
-                settings["instructions"].remove(guide)
-            temporary = config.with_suffix(".graph-mind.tmp")
+        found = [settings.get(key, {}).pop(name, None) for name in (NAME, *OLD_NAMES)]
+        if any(entry is not None for entry in found):
+            if isinstance(settings.get("instructions"), list):
+                settings["instructions"] = [
+                    item for item in settings["instructions"]
+                    if not str(item).endswith(("turnbook.md", "graph-mind.md"))]
+            temporary = config.with_suffix(".turnbook.tmp")
             temporary.write_text(json.dumps(settings, ensure_ascii=False, indent=2),
                                  encoding="utf-8")
             os.replace(temporary, config)
             removed.append(label)
     # our own file, whatever the config says: a commented opencode.jsonc is skipped above, and
     # the plugin went on recording every OpenCode conversation after uninstall
-    plugin = _opencode_dir(home) / "plugins" / "graph-mind.js"
-    if plugin.exists():
-        plugin.unlink()
-        removed.append("OpenCode plugin")
-    _opencode_dir(home).joinpath("graph-mind.md").unlink(missing_ok=True)   # ours by name
+    for name in ("turnbook.js", "graph-mind.js"):              # graph-mind: before 0.11
+        plugin = _opencode_dir(home) / "plugins" / name
+        if plugin.exists():
+            plugin.unlink()
+            removed.append("OpenCode plugin")
+    for name in ("turnbook.md", "graph-mind.md"):                # ours by name
+        _opencode_dir(home).joinpath(name).unlink(missing_ok=True)
     codex_config = home / ".codex" / "config.toml"
     if codex_config.exists():
         text = codex_config.read_text(encoding="utf-8")
@@ -649,24 +720,16 @@ def uninstall(argv=None):
     except (OSError, ValueError, AttributeError):
         pass
     step("memory removed from: " + (", ".join(dict.fromkeys(removed)) or "no app had it"))
-    item = _login_item()
-    if item.exists():
-        if platform.system() == "Darwin":
-            subprocess.run(["launchctl", "unload", str(item)], capture_output=True)
-        item.unlink()
-        step("capture service no longer starts at login")
-    from graph_mind.automatic_capture import default_service_state_dir
-    try:
-        import psutil
-        service = psutil.Process(int((default_service_state_dir() / "service.pid")
-                                     .read_text(encoding="ascii")))
-        if "capture_cli" in " ".join(service.cmdline()):
-            service.terminate()
-            step("capture service stopped")
-    except Exception:                            # no pid file, not running, or already gone
-        pass
-    from graph_mind.paths import graph_mind_home
-    data = graph_mind_home()
+    for item in [_login_item(), *_old_login_items()]:
+        if item.exists():
+            if platform.system() == "Darwin":
+                subprocess.run(["launchctl", "unload", str(item)], capture_output=True)
+            item.unlink()
+            step("capture service no longer starts at login")
+    if _stop_service():
+        step("capture service stopped")
+    from turnbook.paths import turnbook_home
+    data = turnbook_home()
     if args.purge and data.exists():
         if not args.yes and input(f"Delete {data} and everything this PC remembers? "
                                   "This cannot be undone. [y/N] ").lower() != "y":
@@ -674,7 +737,7 @@ def uninstall(argv=None):
         else:
             if (data / "postgres" / "postmaster.pid").exists():     # this PC hosts the hub
                 try:
-                    from graph_mind import sharing
+                    from turnbook import sharing
                     sharing.stop_postgres(data / "postgres")
                 except Exception:
                     pass

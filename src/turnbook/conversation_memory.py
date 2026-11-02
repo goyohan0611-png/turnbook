@@ -12,10 +12,10 @@ import re
 import sqlite3
 import time
 
-from graph_mind.clock import timestamp
-from graph_mind.forget import erase
-from graph_mind.packing import COMPRESS_FROM, pack, unpack
-from graph_mind.paths import use_wal
+from turnbook.clock import timestamp
+from turnbook.forget import erase
+from turnbook.packing import COMPRESS_FROM, pack, unpack
+from turnbook.paths import use_wal
 
 CAPTURE_VERSION = "codex-conversation-capture-v0.1"
 # the start of the memory packet the per-message hook adds (inject.HEADER)
@@ -150,9 +150,9 @@ AGENT_INSTRUCTIONS = re.compile(
 
 
 def masking_on():
-    """On unless ~/.graph-mind/config.json says "mask_secrets": false: someone running a model on
+    """On unless ~/.turnbook/config.json says "mask_secrets": false: someone running a model on
     their own machines may want keys kept in memory verbatim."""
-    from graph_mind.sharing import _config
+    from turnbook.sharing import _config
     return _config().get("mask_secrets", True) is not False
 
 
@@ -907,7 +907,7 @@ class ClaudeCoworkConversationCapture(ClaudeCodeConversationCapture):
 class OpenCodeConversationCapture(ClaudeCodeConversationCapture):
     """OpenCode keeps no transcript file of its own that is meant to be read; Turnbook's plugin
     for it (opencode_plugin.js) appends what was said, in Claude Code's record shape, one file per
-    session under ~/.graph-mind/opencode. Read the same way."""
+    session under ~/.turnbook/opencode. Read the same way."""
 
     CLIENT = "opencode"
 
@@ -1057,7 +1057,7 @@ def copilot_root():
 
 class HookConversationCapture(OpenCodeConversationCapture):
     """Gemini CLI, Cursor, Copilot CLI: Turnbook's hooks (hook.py) write the same records,
-    one folder per agent under ~/.graph-mind/hooks, stored under that agent's name."""
+    one folder per agent under ~/.turnbook/hooks, stored under that agent's name."""
 
     def __init__(self, client, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1065,8 +1065,8 @@ class HookConversationCapture(OpenCodeConversationCapture):
 
 
 def opencode_root():
-    from graph_mind.paths import graph_mind_home
-    return graph_mind_home() / "opencode"
+    from turnbook.paths import turnbook_home
+    return turnbook_home() / "opencode"
 
 
 def cowork_root():

@@ -55,10 +55,10 @@ def memory_for(row, base):
     home = base / "home"
     if not home.exists():
         home.mkdir(parents=True)
-        os.environ["GRAPH_MIND_HOME"] = str(home)
-        from graph_mind.local_embedder import default_embedder
-        from graph_mind.mcp_server import configured_db_path
-        from graph_mind.warmup import warm_turns
+        os.environ["TURNBOOK_HOME"] = str(home)
+        from turnbook.local_embedder import default_embedder
+        from turnbook.mcp_server import configured_db_path
+        from turnbook.warmup import warm_turns
         database = configured_db_path()
         fill(database, row)
         embedder = default_embedder(database)
@@ -71,20 +71,20 @@ def memory_for(row, base):
 def ask(model, row, arm, home, work):
     config = work / "config" / "opencode"
     config.mkdir(parents=True)
-    os.environ.update(XDG_CONFIG_HOME=str(config.parent), GRAPH_MIND_HOME=str(home))
-    from graph_mind import install
+    os.environ.update(XDG_CONFIG_HOME=str(config.parent), TURNBOOK_HOME=str(home))
+    from turnbook import install
     install.opencode(home)
     if ARMS[arm] is None:
         (config / "plugins" / "graph-mind.js").unlink()
     else:
-        os.environ["GRAPH_MIND_INJECT"] = ARMS[arm]
+        os.environ["TURNBOOK_INJECT"] = ARMS[arm]
     date = row["question_date"].split(" ")[0].replace("/", "-")
     try:
         tools, answer, code, error = session(model, f"(Today is {date}.) {row['question']}",
                                              home, config.parent, work / "dir")
     except subprocess.TimeoutExpired:           # one stuck session must not end the run
         tools, answer, code, error = [], "", 1, "timed out"
-    os.environ.pop("GRAPH_MIND_INJECT", None)
+    os.environ.pop("TURNBOOK_INJECT", None)
     return {"tools": tools, "answer": answer, "error": error[-300:] if code else None,
             "calls": getattr(session, "calls", []) if not code else []}
 

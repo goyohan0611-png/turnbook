@@ -38,11 +38,11 @@ sys.path.insert(0, str(ROOT / "research"))
 from longmemeval_m_fetch import stream_instances  # noqa: E402
 from longmemeval_retrieval_executor import asks_assistant_history  # noqa: E402
 
-from graph_mind.context_packet import build_context_pack  # noqa: E402
-from graph_mind.conversation_memory import ConversationMemoryStore  # noqa: E402
-from graph_mind.local_embedder import LOCAL_MODEL, LocalEmbedder  # noqa: E402
-from graph_mind.mcp_server import _PIECES, CONTEXT_CHARS, CONTEXT_LIMIT, gather  # noqa: E402
-from graph_mind.warmup import warm_turns  # noqa: E402
+from turnbook.context_packet import build_context_pack  # noqa: E402
+from turnbook.conversation_memory import ConversationMemoryStore  # noqa: E402
+from turnbook.local_embedder import LOCAL_MODEL, LocalEmbedder  # noqa: E402
+from turnbook.mcp_server import _PIECES, CONTEXT_CHARS, CONTEXT_LIMIT, gather  # noqa: E402
+from turnbook.warmup import warm_turns  # noqa: E402
 
 DATA = ROOT / "research/external/longmemeval/longmemeval_s_cleaned.json"
 TUNED = ROOT / "research/runs/graph-v3.2-untouched-eval-v2/preregistration.json"   # dev2, 120

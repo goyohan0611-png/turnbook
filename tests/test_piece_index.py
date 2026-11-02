@@ -1,12 +1,12 @@
 """Meaning search keeps its pieces in memory between questions: turns added later are searched,
 and a forgotten turn is never returned again."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import tempfile
 import unittest
 
-from graph_mind import mcp_server as server
-from graph_mind.conversation_memory import ConversationMemoryStore
+from turnbook import mcp_server as server
+from turnbook.conversation_memory import ConversationMemoryStore
 
 TOPICS = ("dog", "cat", "beach", "food")
 

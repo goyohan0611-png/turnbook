@@ -1,7 +1,7 @@
 """Your memory as a 3D graph, in the browser: every conversation turn and memory is a node, joined
 by the associations Turnbook already keeps (shared cues, neighbours in time, explicit links).
 
-    turnbook-view               # writes ~/.graph-mind/brain.html and opens it
+    turnbook-view               # writes ~/.turnbook/brain.html and opens it
     turnbook-view --no-text     # no conversation text in the file: safe to screenshot or share
     turnbook-view --limit 2000  # only the most recent 2,000 nodes
 
@@ -17,7 +17,7 @@ import math
 import sqlite3
 import webbrowser
 
-from graph_mind.packing import text_columns, unpack
+from turnbook.packing import text_columns, unpack
 
 LINKS_PER_NODE = 3          # strongest shared-cue links kept per node: all 134k drown the picture
 REGIONS = 12                # coloured clusters named in the legend
@@ -236,7 +236,7 @@ LIBRARY_SRI = "sha384-SIcVySj+Cd1g+cwoLNCdr/osXU15HLXCxfaSzFNkZICYeKS7I2YxhyggCi
 
 
 def _library_tag(inline: bool) -> str:
-    """The 3D library inside the page, fetched once by Python and kept in ~/.graph-mind/vendor.
+    """The 3D library inside the page, fetched once by Python and kept in ~/.turnbook/vendor.
     Loaded from the CDN by the browser instead, a page opened from disk stayed black on a PC
     whose browser would not fetch it. Either way only the pinned bytes run."""
     fallback = (f'<script src="{LIBRARY}" integrity="{LIBRARY_SRI}" '
@@ -245,8 +245,8 @@ def _library_tag(inline: bool) -> str:
         return fallback
     import hashlib
 
-    from graph_mind.paths import graph_mind_home
-    cached = graph_mind_home() / "vendor" / LIBRARY.rsplit("/", 1)[-1].replace(
+    from turnbook.paths import turnbook_home
+    cached = turnbook_home() / "vendor" / LIBRARY.rsplit("/", 1)[-1].replace(
         ".min.js", "-1.73.3.min.js")
     if cached.exists() and hashlib.sha256(cached.read_bytes()).hexdigest() != LIBRARY_SHA256:
         cached.unlink()                      # kept by a version that did not check it
@@ -280,8 +280,8 @@ def build(db_path, out, *, limit=4000, with_text=True, inline_library=True) -> d
 
 
 def main(argv=None):
-    from graph_mind.mcp_server import configured_db_path
-    from graph_mind.paths import graph_mind_home
+    from turnbook.mcp_server import configured_db_path
+    from turnbook.paths import turnbook_home
     parser = argparse.ArgumentParser(description="Open your memory as a 3D graph.")
     parser.add_argument("--limit", type=int, default=4000, help="most recent nodes to draw")
     parser.add_argument("--no-text", action="store_true",
@@ -289,7 +289,7 @@ def main(argv=None):
     parser.add_argument("--out", default=None, help="where to write the page")
     parser.add_argument("--no-open", action="store_true")
     args = parser.parse_args(argv)
-    result = build(configured_db_path(), args.out or graph_mind_home() / "brain.html",
+    result = build(configured_db_path(), args.out or turnbook_home() / "brain.html",
                    limit=args.limit, with_text=not args.no_text)
     print(f"{result['nodes']} memories, {result['links']} links, {result['regions']} regions -> "
           f"{result['file']}")

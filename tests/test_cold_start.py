@@ -5,16 +5,16 @@ capture service stores a day of turns. Before, the server met hundreds of unembe
 them to a background fill and searched none of them by meaning. Now the service embeds what it
 stores, and the server picks those vectors up from the shared cache before it searches.
 """
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 from unittest import mock
 import tempfile
 import unittest
 
-from graph_mind import mcp_server as server
-from graph_mind.conversation_memory import ConversationMemoryStore
-from graph_mind.warmup import warm_turns
-from graph_mind.local_embedder import default_embedder
+from turnbook import mcp_server as server
+from turnbook.conversation_memory import ConversationMemoryStore
+from turnbook.warmup import warm_turns
+from turnbook.local_embedder import default_embedder
 
 FILLER = ["오늘 회의에서 분기 예산 이야기를 길게 했다", "점심 메뉴 고르느라 시간이 걸렸다",
           "빌드가 깨져서 의존성 버전을 다시 맞췄다", "주말에 읽을 책 목록을 정리했다",
@@ -78,7 +78,7 @@ class SharedModelTests(unittest.TestCase):
     def test_a_server_uses_the_capture_services_model_and_never_loads_its_own(self):
         """Every app's server searching by meaning from its first question, at no memory cost:
         the capture service has the model loaded and lends it."""
-        from graph_mind import local_embedder
+        from turnbook import local_embedder
 
         class ServiceModel:                       # the capture service's loaded model
             model_name = local_embedder.LOCAL_MODEL
@@ -106,7 +106,7 @@ class SharedModelTests(unittest.TestCase):
                              [[3.0, 1.0], [5.0, 1.0]])
 
     def test_without_the_service_the_server_loads_its_own_model(self):
-        from graph_mind import local_embedder
+        from turnbook import local_embedder
         local_embedder.service_file().unlink(missing_ok=True)
         with tempfile.TemporaryDirectory() as directory, \
                 mock.patch.object(local_embedder.LocalEmbedder, "USE_SERVICE", True), \
@@ -123,7 +123,7 @@ class SharedModelTests(unittest.TestCase):
         every app's server asks for the same backlog at once."""
         import threading
         import time
-        from graph_mind import local_embedder
+        from turnbook import local_embedder
         encoded = []
 
         def slow(self, texts):

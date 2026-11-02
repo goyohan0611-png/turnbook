@@ -1,11 +1,11 @@
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 import json
 from pathlib import Path
 import tempfile
 import unittest
 
-from graph_mind.conversation_memory import ConversationMemoryStore, OpenCodeConversationCapture
-from graph_mind.inject import context
+from turnbook.conversation_memory import ConversationMemoryStore, OpenCodeConversationCapture
+from turnbook.inject import context
 
 
 class OpenCodeTests(unittest.TestCase):

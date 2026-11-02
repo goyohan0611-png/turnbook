@@ -39,9 +39,9 @@ import time
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from graph_mind.associative_memory import AssociativeMemoryIndex  # noqa: E402
-from graph_mind.conversation_memory import ConversationMemoryStore  # noqa: E402
-from graph_mind.warmup import warm_turns  # noqa: E402
+from turnbook.associative_memory import AssociativeMemoryIndex  # noqa: E402
+from turnbook.conversation_memory import ConversationMemoryStore  # noqa: E402
+from turnbook.warmup import warm_turns  # noqa: E402
 
 CACHE = ROOT / "bench/.cache/latency"
 BASELINE = ROOT / "bench/baseline/latency.json"
@@ -78,7 +78,7 @@ def synthetic_turns(count: int):
 
 def build_store(turns: int) -> Path:
     """The store as a user's PC holds it after capture: turns recorded, indexed, embedded."""
-    from graph_mind.local_embedder import LOCAL_MODEL
+    from turnbook.local_embedder import LOCAL_MODEL
     model = LOCAL_MODEL.rsplit("/", 1)[-1].replace("@", "_").replace("/", "_")
     folder = CACHE / f"{turns}-{model}"       # another model: built and embedded afresh
     store = folder / "memory.sqlite"
@@ -106,7 +106,7 @@ def build_store(turns: int) -> Path:
     return store
 
 
-LEND = ("import sys, time; from graph_mind.local_embedder import default_embedder, serve; "
+LEND = ("import sys, time; from turnbook.local_embedder import default_embedder, serve; "
         "e = default_embedder(sys.argv[1]); e.embed(['warm up']); serve(e); "
         "print('lending', flush=True); time.sleep(86400)")
 
@@ -114,14 +114,14 @@ LEND = ("import sys, time; from graph_mind.local_embedder import default_embedde
 async def run_server(store: Path, target: str, *, service: bool) -> dict:
     from mcp import StdioServerParameters
     home = tempfile.mkdtemp(prefix="graph-mind-bench-home-")
-    env = {**os.environ, "GRAPH_MIND_DB": str(store), "GRAPH_MIND_HOME": home,
+    env = {**os.environ, "TURNBOOK_DB": str(store), "TURNBOOK_HOME": home,
            "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     lender = None
     if service:                         # the capture service, up since login
         lender = subprocess.Popen([sys.executable, "-c", LEND, str(store)], env=env,
                                   cwd=str(ROOT / "src"), stdout=subprocess.PIPE, text=True)
         lender.stdout.readline()
-    params = StdioServerParameters(command=sys.executable, args=["-m", "graph_mind.mcp_server"],
+    params = StdioServerParameters(command=sys.executable, args=["-m", "turnbook.mcp_server"],
                                    env=env, cwd=str(ROOT / "src"))
     try:
         return await _timed(params, target)
@@ -156,7 +156,7 @@ async def _timed(params, target: str) -> dict:
         across = target in packet.get("ids", [])
         steady = [(await ask(session, QUESTIONS[i % len(QUESTIONS)]))[0] for i in range(30)]
         servers = [p for p in psutil.Process().children(recursive=True)
-                   if "graph_mind.mcp_server" in " ".join(p.cmdline())]
+                   if "turnbook.mcp_server" in " ".join(p.cmdline())]
         rss = max((p.memory_info().rss for p in servers), default=0)
     steady.sort()
     return {"ready_s": round(ready, 2), "first_answer_ms": round(first_ms),

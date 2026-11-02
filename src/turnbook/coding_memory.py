@@ -12,9 +12,9 @@ import re
 import sqlite3
 import stat
 
-from graph_mind.clock import timestamp
-from graph_mind.conversation_memory import _redact
-from graph_mind.paths import use_wal
+from turnbook.clock import timestamp
+from turnbook.conversation_memory import _redact
+from turnbook.paths import use_wal
 
 CAPTURE_VERSION = "coding-memory-v0.1"
 MAX_SOURCE_BYTES = 2 * 1024 * 1024

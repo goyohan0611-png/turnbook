@@ -33,16 +33,16 @@ import sys
 import tempfile
 import uuid
 
-import episode_eval  # noqa: F401  (first: isolates GRAPH_MIND_HOME, sets up the paths)
+import episode_eval  # noqa: F401  (first: isolates TURNBOOK_HOME, sets up the paths)
 
 from evidence import CACHE, DATA, fill, iso  # noqa: E402
 from longmemeval_m_fetch import stream_instances  # noqa: E402
 
-from graph_mind import context_packet  # noqa: E402
-from graph_mind.context_packet import build_context_pack  # noqa: E402
-from graph_mind.local_brain import LocalBrainStore  # noqa: E402
-from graph_mind.mcp_server import _PIECES, CONTEXT_CHARS, CONTEXT_LIMIT, gather  # noqa: E402
-from graph_mind.warmup import warm_turns  # noqa: E402
+from turnbook import context_packet  # noqa: E402
+from turnbook.context_packet import build_context_pack  # noqa: E402
+from turnbook.local_brain import LocalBrainStore  # noqa: E402
+from turnbook.mcp_server import _PIECES, CONTEXT_CHARS, CONTEXT_LIMIT, gather  # noqa: E402
+from turnbook.warmup import warm_turns  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "runs/graph-v9.7-consolidation-clean"
 TYPE = "multi-session"
@@ -79,7 +79,7 @@ def packet(row, store, question, embedder):
 
 def build(name, arms):
     """arms: {arm: fn(row, store) -> question or None}; one packet per arm per question."""
-    from graph_mind.local_embedder import LocalEmbedder
+    from turnbook.local_embedder import LocalEmbedder
     embedder = LocalEmbedder(CACHE / "embed-cache.json")
     logs = {}
     for arm in arms:

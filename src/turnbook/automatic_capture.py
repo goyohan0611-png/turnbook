@@ -9,9 +9,9 @@ import subprocess
 import sys
 import time
 
-from graph_mind.associative_memory import AssociativeMemoryIndex
-from graph_mind.coding_memory import CodingMemoryCapture, CodingMemoryStore
-from graph_mind.conversation_memory import (
+from turnbook.associative_memory import AssociativeMemoryIndex
+from turnbook.coding_memory import CodingMemoryCapture, CodingMemoryStore
+from turnbook.conversation_memory import (
     ClaudeCodeConversationCapture,
     ClaudeCoworkConversationCapture,
     CodexConversationCapture,
@@ -25,17 +25,17 @@ from graph_mind.conversation_memory import (
     cursor_root,
     opencode_root,
 )
-from graph_mind.paths import default_coding_state_dir, default_development_db, graph_mind_home
+from turnbook.paths import default_coding_state_dir, default_development_db, turnbook_home
 
 SERVICE_VERSION = "automatic-capture-v0.2"
 
 
 def default_config_path():
-    return graph_mind_home() / "automatic-capture.json"
+    return turnbook_home() / "automatic-capture.json"
 
 
 def default_service_state_dir():
-    return graph_mind_home() / "automatic-capture"
+    return turnbook_home() / "automatic-capture"
 
 
 def running_service(state_dir=None):
@@ -78,7 +78,7 @@ def ensure_service() -> bool:
             detach = {"creationflags": subprocess.DETACHED_PROCESS}
         else:
             detach = {"start_new_session": True}
-        child = subprocess.Popen([str(python), "-m", "graph_mind.capture_cli", "run"],
+        child = subprocess.Popen([str(python), "-m", "turnbook.capture_cli", "run"],
                                  cwd=Path.home(), stdin=subprocess.DEVNULL,
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **detach)
         (state / "service.pid").write_text(f"{child.pid}\n", encoding="ascii")
@@ -158,12 +158,12 @@ class AutomaticCaptureService:
                 entry["project_id"]), now=self.now)
 
     def _shared(self):
-        """The shared folder or Postgres URL, if any: config, GRAPH_MIND_FOLDER, or the one
+        """The shared folder or Postgres URL, if any: config, TURNBOOK_FOLDER, or the one
         chosen in conversation; the service's own wins."""
-        from graph_mind.sharing import folder
+        from turnbook.sharing import folder
         shared = folder()
         if self.config.get("memory_folder"):
-            from graph_mind.sharing import is_database
+            from turnbook.sharing import is_database
             chosen = self.config["memory_folder"]
             shared = chosen if is_database(chosen) else Path(chosen).expanduser()
         return shared
@@ -175,7 +175,7 @@ class AutomaticCaptureService:
         try:
             shared = self._shared()
             if shared:
-                from graph_mind.sharing import sync
+                from turnbook.sharing import sync
                 sync(shared, self.db_path)
         except Exception:                       # the hub PC is off: next time
             pass
@@ -193,11 +193,11 @@ class AutomaticCaptureService:
         shared = self._shared()
         publish = None
         if shared:
-            from graph_mind.sharing import append
+            from turnbook.sharing import append
 
             def publish(turn):                  # to a folder or a Postgres URL
                 append(shared, "turn", turn)
-        from graph_mind.forget import forget_ids
+        from turnbook.forget import forget_ids
 
         def forget(turn_ids):
             forget_ids({"turn_ids": turn_ids}, self.db_path, shared)
@@ -233,12 +233,12 @@ class AutomaticCaptureService:
             cursor = self.state_dir / "cursor-session-cursor.json"
             sources.append(("cursor", CursorConversationCapture(
                 cursor_projects, store, state_path=cursor, **hooks), cursor))
-        from graph_mind.documents import DocumentCapture, folders
+        from turnbook.documents import DocumentCapture, folders
         if folders():                           # turnbook docs add <folder>
             cursor = self.state_dir / "documents-state.json"
             sources.append(("documents", DocumentCapture(folders(), store, state_path=cursor,
                                                          **hooks), cursor))
-        from graph_mind.hook import hooks_root
+        from turnbook.hook import hooks_root
         agents = Path(self.config.get("hooks_root") or hooks_root())
         for agent_dir in sorted(agents.iterdir()) if agents.is_dir() else []:
             if agent_dir.is_dir():
@@ -274,7 +274,7 @@ class AutomaticCaptureService:
     def run_once(self, *, capture_code=True):
         started = self.now()
         coding, errors = [], []
-        from graph_mind.forget import retry_deletions
+        from turnbook.forget import retry_deletions
         try:
             retry_deletions(self.db_path, wait=True)
         except Exception as error:
@@ -412,8 +412,8 @@ class AutomaticCaptureService:
         memory servers pick the vectors up from the shared cache). Only the long-running service
         does this: a one-off `once` or a test should not load the embedding model."""
         try:
-            from graph_mind.local_embedder import default_embedder
-            from graph_mind.warmup import warm_turns
+            from turnbook.local_embedder import default_embedder
+            from turnbook.warmup import warm_turns
             if getattr(self, "_embedder", None) is None:
                 self._embedder = default_embedder(self.db_path)
             return warm_turns(self.db_path, limit=limit or EMBED_BATCH, embedder=self._embedder)
@@ -426,8 +426,8 @@ class AutomaticCaptureService:
         gemma vector, model.txt names gemma and the service starts again with it. True when
         that moment came."""
         try:
-            from graph_mind.local_embedder import GEMMA, default_embedder, model_file
-            from graph_mind.warmup import warm_turns
+            from turnbook.local_embedder import GEMMA, default_embedder, model_file
+            from turnbook.warmup import warm_turns
             if getattr(self, "_gemma", None) is None:
                 self._gemma = default_embedder(self.db_path, model=GEMMA)
             if warm_turns(self.db_path, limit=MIGRATE_BATCH, embedder=self._gemma):
@@ -451,7 +451,7 @@ class AutomaticCaptureService:
                     if time.monotonic() - getattr(self, "_older_checked", -1e9) < 600:
                         return False
                     self._older_checked = time.monotonic()
-                    from graph_mind.packing import older_processes
+                    from turnbook.packing import older_processes
                     if older_processes():
                         return False             # asked again at the next recheck
                     store.start_packing()
@@ -467,7 +467,7 @@ class AutomaticCaptureService:
         """Load the model now and let the memory servers use it (local_embedder.serve), so an
         app's search by meaning works from its first question without loading its own."""
         try:
-            from graph_mind.local_embedder import default_embedder, serve
+            from turnbook.local_embedder import default_embedder, serve
             if getattr(self, "_embedder", None) is None:
                 self._embedder = default_embedder(self.db_path)
             self._embedder.embed(["warm up"])
@@ -481,8 +481,8 @@ class AutomaticCaptureService:
             pass
 
     def answer_context(self, message: str) -> str:
-        """The memory for one message, for the per-message hook (graph_mind.inject)."""
-        from graph_mind.inject import context
+        """The memory for one message, for the per-message hook (turnbook.inject)."""
+        from turnbook.inject import context
         return context(message, database=self.db_path, embedder=self._embedder)
 
     def run_forever(self, *, max_iterations=None):
@@ -497,7 +497,7 @@ class AutomaticCaptureService:
         self.pid_path.write_text(str(os.getpid()) + "\n", encoding="ascii")
         migrate = False
         if max_iterations is None:
-            from graph_mind.local_embedder import LocalEmbedder, migrating
+            from turnbook.local_embedder import LocalEmbedder, migrating
             LocalEmbedder.PACE = True       # it runs beside the user's work: backlogs at half pace
             try:                            # and below the user's own programs
                 import psutil
@@ -511,12 +511,12 @@ class AutomaticCaptureService:
                 # models nothing reads any more: an upgrade by pip alone never ran the installer
                 import threading
 
-                from graph_mind.install import remove_old_models
+                from turnbook.install import remove_old_models
                 threading.Thread(target=remove_old_models, daemon=True).start()
             try:                        # once per store: copies stored before 0.9.2, and the
                 with ConversationMemoryStore(self.db_path) as store:      # keyword-made memories
                     store.drop_duplicates()
-                from graph_mind.semantic_memory import drop_keyword_memories
+                from turnbook.semantic_memory import drop_keyword_memories
                 drop_keyword_memories(self.db_path)
             except Exception:
                 pass                    # tried again at the next start

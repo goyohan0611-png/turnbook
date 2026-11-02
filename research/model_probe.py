@@ -120,7 +120,7 @@ def encoder(model):
     from tokenizers import Tokenizer
     import numpy as np
     import onnxruntime
-    from graph_mind.local_embedder import model_paths
+    from turnbook.local_embedder import model_paths
     tok_file, onnx_file = model_paths(model)
     tok = Tokenizer.from_file(tok_file)
     tok.enable_truncation(256)
@@ -151,7 +151,7 @@ def encoder(model):
 
 def run(model):
     import numpy as np
-    from graph_mind.local_embedder import model_paths
+    from turnbook.local_embedder import model_paths
     query, passage = next((v for k, v in PREFIX.items() if model.startswith(k)), ("", ""))
     started = time.perf_counter()
     encode = encoder(model)

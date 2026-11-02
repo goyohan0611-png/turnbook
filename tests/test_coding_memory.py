@@ -1,9 +1,9 @@
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import tempfile
 import unittest
 
-from graph_mind.coding_memory import CodingMemoryCapture, CodingMemoryStore
+from turnbook.coding_memory import CodingMemoryCapture, CodingMemoryStore
 
 
 T1 = "2026-09-15T10:00:00"

@@ -18,7 +18,7 @@ import learning_curve as lc  # noqa: E402
 import numpy as np  # noqa: E402
 import rerank_v2 as v2  # noqa: E402
 
-from graph_mind.mcp_server import RERANK  # noqa: E402
+from turnbook.mcp_server import RERANK  # noqa: E402
 
 V2 = [n for n in v2.NAMES if n != "length"]
 

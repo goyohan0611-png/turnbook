@@ -1,4 +1,4 @@
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import os
 import tempfile
@@ -6,9 +6,9 @@ import unittest
 
 from mcp import Client
 
-from graph_mind.conversation_memory import ConversationMemoryStore
-from graph_mind.local_brain import LocalBrainStore
-from graph_mind.mcp_server import build_server, wait_for_index
+from turnbook.conversation_memory import ConversationMemoryStore
+from turnbook.local_brain import LocalBrainStore
+from turnbook.mcp_server import build_server, wait_for_index
 
 
 class TransplantTests(unittest.IsolatedAsyncioTestCase):
@@ -122,7 +122,7 @@ class MeaningTests(unittest.IsolatedAsyncioTestCase):
                             ).structured_content.get("matches", [])
                     found[query] = [m["content"][:10] for m in rows]
         self.assertEqual(found["What breed is my dog?"][:1], ["Our golden"])
-        from graph_mind.local_embedder import LOCAL_MODEL, PRESETS
+        from turnbook.local_embedder import LOCAL_MODEL, PRESETS
         if LOCAL_MODEL == PRESETS["multilingual"]:   # the English model reads no Korean
             self.assertEqual(found["우리 강아지 품종이 뭐였지?"][:1], ["Our golden"])
         self.assertEqual(found["Paris weather forecast?"], [])
@@ -131,7 +131,7 @@ class MeaningTests(unittest.IsolatedAsyncioTestCase):
 class TerminalCommandTests(unittest.TestCase):
     def test_a_path_that_would_run_a_command_is_refused(self):
         """The user pastes this command: a path like  x"; evil; #  must not run evil."""
-        from graph_mind.mcp_server import folder_commands
+        from turnbook.mcp_server import folder_commands
         self.assertEqual(folder_commands(r"C:\Users\me\Brain", False, None, None),
                          r'turnbook folder "C:\Users\me\Brain"')
         for bad in [r'C:\Memory"; Write-Output X; #', "a$(id)", "x & calc", "a`b", "x\nrm"]:

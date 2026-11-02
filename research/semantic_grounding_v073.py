@@ -29,9 +29,9 @@ import math
 import os
 import threading
 
-from graph_mind.local_embedder import LOCAL_MODEL, LocalEmbedder, cosine  # noqa: F401
+from turnbook.local_embedder import LOCAL_MODEL, LocalEmbedder, cosine  # noqa: F401
 
-from graph_mind.associative_memory import AssociativeMemoryIndex, _terms
+from turnbook.associative_memory import AssociativeMemoryIndex, _terms
 from grounded_concept_bridge_v072 import (ACTIVATE, BLIND_CASES, BLIND_ROOT, CASES_PATH,
     _blind_plan_map, _frozen_plans, _metric, _read_json, _summary, _write_json)
 

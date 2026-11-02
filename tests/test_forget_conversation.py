@@ -1,6 +1,6 @@
 """Forgetting by asking the assistant: it lists masked candidates, deletes only what the user
 picks, and the conversation about deleting is not remembered either."""
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import json
 import tempfile
@@ -8,9 +8,9 @@ import unittest
 
 from mcp import Client
 
-from graph_mind.conversation_memory import ClaudeCodeConversationCapture, ConversationMemoryStore
-from graph_mind.forget import masked_preview
-from graph_mind.mcp_server import build_server, wait_for_index
+from turnbook.conversation_memory import ClaudeCodeConversationCapture, ConversationMemoryStore
+from turnbook.forget import masked_preview
+from turnbook.mcp_server import build_server, wait_for_index
 
 SECRET = "qwer1234!"
 

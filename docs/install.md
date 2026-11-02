@@ -145,5 +145,5 @@ tools get confused with each other.
 ## Removing it
 
 `turnbook-uninstall` unregisters it from every app, removes the login item and stops the capture
-service. Your memory stays in `~/.graph-mind` unless you add `--purge`. Then
+service. Your memory stays in `~/.turnbook` unless you add `--purge`. Then
 `pip uninstall turnbook` (or `uv tool uninstall turnbook`) removes the program.

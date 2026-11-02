@@ -1,11 +1,11 @@
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import tempfile
 import unittest
 
-from graph_mind.conversation_memory import ConversationMemoryStore
-from graph_mind.local_brain import LocalBrainStore
-from graph_mind.semantic_memory import SemanticMemoryIngestion, classify_durable_turn
+from turnbook.conversation_memory import ConversationMemoryStore
+from turnbook.local_brain import LocalBrainStore
+from turnbook.semantic_memory import SemanticMemoryIngestion, classify_durable_turn
 
 
 T = "2026-09-16T12:00:00"
@@ -61,7 +61,7 @@ class SemanticMemoryTests(unittest.TestCase):
 
     def test_keyword_made_memories_are_dropped_once_but_remember_requests_stay(self):
         """0.10.5: the gate no longer runs; what it made by keyword goes, the turns stay."""
-        from graph_mind.semantic_memory import drop_keyword_memories
+        from turnbook.semantic_memory import drop_keyword_memories
         with tempfile.TemporaryDirectory() as directory:
             db = Path(directory) / "brain.sqlite"
             with ConversationMemoryStore(db) as store:

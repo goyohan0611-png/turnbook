@@ -4,7 +4,7 @@ What has to hold for it to feel like one memory and not two machines reading eac
 saved on one PC is recalled on the other; a fact corrected on the second PC replaces the first PC's
 version everywhere; and nothing but plain log lines is ever written into the shared folder.
 """
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 from contextlib import contextmanager
 import json
@@ -17,7 +17,7 @@ import unittest.mock
 
 from mcp import Client
 
-from graph_mind.mcp_server import build_server, wait_for_index
+from turnbook.mcp_server import build_server, wait_for_index
 
 
 def serve(path):
@@ -40,7 +40,7 @@ def plain_directory():
 @contextmanager
 def scratch_postgres(root: Path, port: int):
     """A throwaway Postgres on `root` (the hub's own programs), and its admin URL."""
-    from graph_mind import sharing
+    from turnbook import sharing
     data = root / "pg"
     sharing._initdb_with_retries(data)
     sharing._start(data, port)
@@ -60,14 +60,14 @@ class SharedBrainTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             shared = root / "OneDrive" / "Graph-MIND"
-            os.environ["GRAPH_MIND_FOLDER"] = str(shared)
+            os.environ["TURNBOOK_FOLDER"] = str(shared)
             try:
-                os.environ["GRAPH_MIND_DEVICE"] = "desktop"
+                os.environ["TURNBOOK_DEVICE"] = "desktop"
                 async with Client(serve(root / "desktop-index.sqlite")) as desktop:
                     saved = await desktop.call_tool("brain_remember", remember("사는 곳: 서울"))
                     seoul = saved.structured_content["memory_id"]
 
-                os.environ["GRAPH_MIND_DEVICE"] = "laptop"
+                os.environ["TURNBOOK_DEVICE"] = "laptop"
                 async with Client(serve(root / "laptop-index.sqlite")) as laptop:
                     seen = await laptop.call_tool("brain_recall", {"query": "사는 곳"})
                     self.assertEqual([m["memory_id"] for m
@@ -78,7 +78,7 @@ class SharedBrainTests(unittest.IsolatedAsyncioTestCase):
                     self.assertFalse(moved.is_error, "the laptop can replace a desktop memory")
                     busan = moved.structured_content["memory_id"]
 
-                os.environ["GRAPH_MIND_DEVICE"] = "desktop"
+                os.environ["TURNBOOK_DEVICE"] = "desktop"
                 async with Client(serve(root / "desktop-index.sqlite")) as desktop:
                     now = await desktop.call_tool("brain_recall", {"query": "사는 곳"})
                     self.assertEqual([m["memory_id"] for m
@@ -95,20 +95,20 @@ class SharedBrainTests(unittest.IsolatedAsyncioTestCase):
                                  "only plain logs live in the shared folder, never a database")
             finally:
                 wait_for_index()          # the index files must be closed before cleanup
-                os.environ.pop("GRAPH_MIND_FOLDER", None)
-                os.environ.pop("GRAPH_MIND_DEVICE", None)
+                os.environ.pop("TURNBOOK_FOLDER", None)
+                os.environ.pop("TURNBOOK_DEVICE", None)
 
     async def test_two_pcs_share_one_brain_through_postgres(self):
         """The same, with the log in Postgres (a real server, started on a temp dir)."""
         with plain_directory() as directory, scratch_postgres(Path(directory), 54392) as url:
             root = Path(directory)
-            os.environ["GRAPH_MIND_FOLDER"] = url
+            os.environ["TURNBOOK_FOLDER"] = url
             try:
-                os.environ["GRAPH_MIND_DEVICE"] = "desktop"
+                os.environ["TURNBOOK_DEVICE"] = "desktop"
                 async with Client(serve(root / "desktop-index.sqlite")) as desktop:
                     saved = await desktop.call_tool("brain_remember", remember("사는 곳: 서울"))
                     seoul = saved.structured_content["memory_id"]
-                os.environ["GRAPH_MIND_DEVICE"] = "laptop"
+                os.environ["TURNBOOK_DEVICE"] = "laptop"
                 async with Client(serve(root / "laptop-index.sqlite")) as laptop:
                     seen = await laptop.call_tool("brain_recall", {"query": "사는 곳"})
                     self.assertEqual([m["memory_id"] for m
@@ -118,31 +118,31 @@ class SharedBrainTests(unittest.IsolatedAsyncioTestCase):
                     busan = moved.structured_content["memory_id"]
                     shown = await laptop.call_tool("brain_folder", {})
                     self.assertEqual(shown.structured_content["devices"], ["desktop", "laptop"])
-                os.environ["GRAPH_MIND_DEVICE"] = "desktop"
+                os.environ["TURNBOOK_DEVICE"] = "desktop"
                 async with Client(serve(root / "desktop-index.sqlite")) as desktop:
                     now = await desktop.call_tool("brain_recall", {"query": "사는 곳"})
                     self.assertEqual([m["memory_id"] for m
                                       in now.structured_content["matches"]], [busan])
             finally:
                 wait_for_index()
-                os.environ.pop("GRAPH_MIND_FOLDER", None)
-                os.environ.pop("GRAPH_MIND_DEVICE", None)
+                os.environ.pop("TURNBOOK_FOLDER", None)
+                os.environ.pop("TURNBOOK_DEVICE", None)
 
     async def test_connection_code_joins_another_pc(self):
         """'다른 PC도 붙게 해줘' on the desktop, the code pasted on the laptop: one brain.
         The laptop comes in over the network address (not 127.0.0.1), so it is the password
         that lets it in."""
-        from graph_mind import sharing
+        from turnbook import sharing
         import psycopg
         with plain_directory() as directory:
             root = Path(directory)
             port, sharing.PORT = sharing.PORT, 54391        # never the real hub's port
             sharing._LOCAL_URI.clear()
-            home_before = os.environ["GRAPH_MIND_HOME"]          # the isolated one (_isolate)
-            os.environ["GRAPH_MIND_HOME"] = str(root / "home")
+            home_before = os.environ["TURNBOOK_HOME"]          # the isolated one (_isolate)
+            os.environ["TURNBOOK_HOME"] = str(root / "home")
             try:
-                os.environ["GRAPH_MIND_DEVICE"] = "desktop"
-                os.environ["GRAPH_MIND_CONFIG"] = str(root / "desktop-config.json")
+                os.environ["TURNBOOK_DEVICE"] = "desktop"
+                os.environ["TURNBOOK_CONFIG"] = str(root / "desktop-config.json")
                 with unittest.mock.patch.object(sharing, "_firewall", return_value="open"):
                     async with Client(serve(root / "desktop-index.sqlite")) as desktop:
                         shared = await desktop.call_tool("brain_folder", {"path": "share"})
@@ -167,8 +167,8 @@ class SharedBrainTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(psycopg.OperationalError):    # the admin stays local
                     psycopg.connect(f"postgresql://postgres@{lan}:54391/postgres")
 
-                os.environ["GRAPH_MIND_DEVICE"] = "laptop"
-                os.environ["GRAPH_MIND_CONFIG"] = str(root / "laptop-config.json")
+                os.environ["TURNBOOK_DEVICE"] = "laptop"
+                os.environ["TURNBOOK_CONFIG"] = str(root / "laptop-config.json")
                 async with Client(serve(root / "laptop-index.sqlite")) as laptop:
                     joined = await laptop.call_tool("brain_folder", {"path": code})
                     self.assertEqual(joined.structured_content["folder"],
@@ -189,9 +189,9 @@ class SharedBrainTests(unittest.IsolatedAsyncioTestCase):
                     sharing.set_folder("gm1.not-a-code")
             finally:
                 wait_for_index()
-                for name in ("GRAPH_MIND_DEVICE", "GRAPH_MIND_CONFIG"):
+                for name in ("TURNBOOK_DEVICE", "TURNBOOK_CONFIG"):
                     os.environ.pop(name, None)
-                os.environ["GRAPH_MIND_HOME"] = home_before
+                os.environ["TURNBOOK_HOME"] = home_before
                 sharing.stop_postgres(root / "home" / "postgres")
                 sharing.PORT = port
                 sharing._LOCAL_URI.clear()
@@ -203,8 +203,8 @@ class SharedBrainTests(unittest.IsolatedAsyncioTestCase):
             root = Path(directory)
             shared = root / "GoogleDrive" / "Turnbook"
             try:
-                os.environ["GRAPH_MIND_DEVICE"] = "desktop"
-                os.environ["GRAPH_MIND_CONFIG"] = str(root / "desktop-config.json")
+                os.environ["TURNBOOK_DEVICE"] = "desktop"
+                os.environ["TURNBOOK_CONFIG"] = str(root / "desktop-config.json")
                 async with Client(serve(root / "desktop-index.sqlite")) as desktop:
                     before = await desktop.call_tool("brain_folder", {})
                     self.assertIsNone(before.structured_content["folder"])
@@ -224,13 +224,13 @@ class SharedBrainTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("gme1:", logs)
                 self.assertNotIn("서울", logs, "the cloud service sees only ciphertext")
 
-                os.environ["GRAPH_MIND_DEVICE"] = "laptop"
-                os.environ["GRAPH_MIND_CONFIG"] = str(root / "laptop-config.json")
+                os.environ["TURNBOOK_DEVICE"] = "laptop"
+                os.environ["TURNBOOK_CONFIG"] = str(root / "laptop-config.json")
                 async with Client(serve(root / "laptop-index.sqlite")) as laptop:
                     refused = await laptop.call_tool("brain_folder", {"path": str(shared)})
                     self.assertEqual(refused.structured_content["status"],
                                      "FOLDER_PASSWORD_NEEDED")
-                    from graph_mind import sharing
+                    from turnbook import sharing
                     with self.assertRaises(ValueError):
                         sharing.set_folder(shared, "wrong-password")
                     sharing.set_folder(shared, password)     # what the terminal prompt does
@@ -241,14 +241,14 @@ class SharedBrainTests(unittest.IsolatedAsyncioTestCase):
                                      "the laptop knows what the desktop knew")
             finally:
                 wait_for_index()
-                os.environ.pop("GRAPH_MIND_DEVICE", None)
-                os.environ.pop("GRAPH_MIND_CONFIG", None)
+                os.environ.pop("TURNBOOK_DEVICE", None)
+                os.environ.pop("TURNBOOK_CONFIG", None)
 
 
 class SyncCursorTests(unittest.TestCase):
     def test_lines_are_read_again_until_they_are_imported(self):
         """The cursor moved before the import: a crash in between skipped those lines for good."""
-        from graph_mind import sharing
+        from turnbook import sharing
         with tempfile.TemporaryDirectory() as directory:
             shared, index = Path(directory) / "shared", Path(directory) / "index.sqlite"
             (shared / "log").mkdir(parents=True)
@@ -272,8 +272,8 @@ class HubCursorTests(unittest.TestCase):
         """The cursor was plain "postgres": after reading hub A to row 3, hub B's rows 1-3
         were skipped."""
         import psycopg
-        from graph_mind import sharing
-        from graph_mind.conversation_memory import ConversationMemoryStore
+        from turnbook import sharing
+        from turnbook.conversation_memory import ConversationMemoryStore
 
         def turn(i):
             return {"turn_id": f"t{i}", "client": "codex", "client_session_id": "s",
@@ -282,7 +282,7 @@ class HubCursorTests(unittest.TestCase):
                     "happened_at": "2026-10-01T09:00:00", "known_at": "2026-10-01T09:00:00",
                     "redaction_count": 0, "cwd": None}
         with plain_directory() as directory, scratch_postgres(Path(directory), 54397) as url, \
-                unittest.mock.patch.dict(os.environ, {"GRAPH_MIND_DEVICE": "desk"}):
+                unittest.mock.patch.dict(os.environ, {"TURNBOOK_DEVICE": "desk"}):
             index = Path(directory) / "index.sqlite"
             sharing.append_many(url, [("turn", turn(i)) for i in (1, 2, 3)])   # hub A
             sharing.sync(url, index)
@@ -300,10 +300,10 @@ class MoveFolderTests(unittest.TestCase):
     def test_sharing_existing_memories_again_fills_a_new_folder(self):
         """Exported ids were kept without where they went: after moving to an empty folder,
         sharing what this PC had sent nothing."""
-        from graph_mind import sharing
-        from graph_mind.conversation_memory import ConversationMemoryStore
+        from turnbook import sharing
+        from turnbook.conversation_memory import ConversationMemoryStore
         with tempfile.TemporaryDirectory() as directory, \
-                unittest.mock.patch.dict(os.environ, {"GRAPH_MIND_DEVICE": "desk"}):
+                unittest.mock.patch.dict(os.environ, {"TURNBOOK_DEVICE": "desk"}):
             root = Path(directory)
             index = root / "index.sqlite"
             with ConversationMemoryStore(index) as store:
@@ -324,10 +324,10 @@ class DamagedLogTests(unittest.TestCase):
     def test_a_torn_line_or_a_malformed_record_loses_nothing_else(self):
         """Codex round 10: a crash mid-write glued the next record to half a line; one record
         with a numeric written_at stopped every later sync."""
-        from graph_mind import sharing
-        from graph_mind.conversation_memory import ConversationMemoryStore
+        from turnbook import sharing
+        from turnbook.conversation_memory import ConversationMemoryStore
         with tempfile.TemporaryDirectory() as directory, \
-                unittest.mock.patch.dict(os.environ, {"GRAPH_MIND_DEVICE": "desk"}):
+                unittest.mock.patch.dict(os.environ, {"TURNBOOK_DEVICE": "desk"}):
             shared, index = Path(directory) / "shared", Path(directory) / "index.sqlite"
             (shared / "log").mkdir(parents=True)
             log = shared / "log" / "desk.jsonl"
@@ -351,7 +351,7 @@ class DamagedLogTests(unittest.TestCase):
     def test_a_malformed_connection_code_is_refused(self):
         import base64
         import json
-        from graph_mind import sharing
+        from turnbook import sharing
 
         def code(**changes):
             value = {"h": ["192.168.0.2"], "p": 54329, "k": "pw", "c": None, **changes}
@@ -366,19 +366,19 @@ class DamagedLogTests(unittest.TestCase):
 class SameNameTests(unittest.TestCase):
     def test_two_pcs_with_one_name_write_separate_logs(self):
         """Both appended to user-pc.jsonl, and the sync client kept only one PC's copy."""
-        from graph_mind import sharing
+        from turnbook import sharing
         with tempfile.TemporaryDirectory() as directory, \
                 unittest.mock.patch.dict(os.environ, {}, clear=False), \
                 unittest.mock.patch.object(sharing.platform, "node", return_value="USER-PC"):
-            os.environ.pop("GRAPH_MIND_DEVICE", None)
+            os.environ.pop("TURNBOOK_DEVICE", None)
             shared = Path(directory) / "shared"
             names, password = [], None
             for pc in ("first", "second"):       # both chose the folder before either one wrote
-                os.environ["GRAPH_MIND_CONFIG"] = str(Path(directory) / pc / "config.json")
+                os.environ["TURNBOOK_CONFIG"] = str(Path(directory) / pc / "config.json")
                 sharing.set_folder(shared, password)
                 password = sharing.folder_password(shared)
             for pc in ("first", "second"):
-                os.environ["GRAPH_MIND_CONFIG"] = str(Path(directory) / pc / "config.json")
+                os.environ["TURNBOOK_CONFIG"] = str(Path(directory) / pc / "config.json")
                 sharing.append(shared, "forget", {"memory_ids": [pc]})
                 sharing.append(shared, "forget", {"memory_ids": [pc]})   # same file again
                 names.append(sharing.log_name())
@@ -394,7 +394,7 @@ if __name__ == "__main__":
 
 class SealTests(unittest.TestCase):
     def test_lines_are_sealed_with_the_code_password(self):
-        from graph_mind import sharing
+        from turnbook import sharing
         joined = "postgresql://graphmind:s3cret-pw@192.0.2.1:54329/graphmind"
         line = json.dumps({"kind": "turn", "record": {"content_redacted": "회의실 와이파이는 7층"}},
                           ensure_ascii=False)
@@ -408,12 +408,12 @@ class SealTests(unittest.TestCase):
         self.assertIsNone(sharing._unseal(stranger, line), "a plain line on a keyed hub")
 
     def test_a_synced_folder_holds_only_ciphertext(self):
-        from graph_mind import sharing
-        from graph_mind.forget import scrub_shared
+        from turnbook import sharing
+        from turnbook.forget import scrub_shared
         with tempfile.TemporaryDirectory() as directory, \
-                unittest.mock.patch.dict(os.environ, {"GRAPH_MIND_DEVICE": "desktop"}):
+                unittest.mock.patch.dict(os.environ, {"TURNBOOK_DEVICE": "desktop"}):
             shared = Path(directory) / "OneDrive" / "Turnbook"
-            os.environ["GRAPH_MIND_CONFIG"] = str(Path(directory) / "desktop.json")
+            os.environ["TURNBOOK_CONFIG"] = str(Path(directory) / "desktop.json")
             (shared / "log").mkdir(parents=True)
             turn = {"turn_id": "t1", "content_redacted": "회의실 와이파이는 7층"}
             sharing._folder_append(shared, sharing._lines([("turn", turn)]))   # from before
@@ -425,19 +425,19 @@ class SealTests(unittest.TestCase):
             self.assertEqual(scrub_shared(shared, {"turn_ids": ["t1"]}), 1,
                              "forgetting finds a sealed line")
 
-            os.environ["GRAPH_MIND_DEVICE"] = "laptop"
-            os.environ["GRAPH_MIND_CONFIG"] = str(Path(directory) / "laptop.json")
+            os.environ["TURNBOOK_DEVICE"] = "laptop"
+            os.environ["TURNBOOK_CONFIG"] = str(Path(directory) / "laptop.json")
             with self.assertRaises(PermissionError):         # queued by append, never in clear
                 sharing._folder_append(shared, sharing._lines([("turn", turn)]))
             self.assertFalse((shared / "log" / "laptop.jsonl").exists())
 
     def test_a_pc_that_read_past_sealed_lines_reads_them_once_it_has_the_password(self):
-        from graph_mind import sharing
+        from turnbook import sharing
         with tempfile.TemporaryDirectory() as directory, \
-                unittest.mock.patch.dict(os.environ, {"GRAPH_MIND_DEVICE": "desktop"}):
+                unittest.mock.patch.dict(os.environ, {"TURNBOOK_DEVICE": "desktop"}):
             root = Path(directory)
             shared = root / "OneDrive" / "Turnbook"
-            os.environ["GRAPH_MIND_CONFIG"] = str(root / "desktop.json")
+            os.environ["TURNBOOK_CONFIG"] = str(root / "desktop.json")
             sharing.set_folder(shared)
             password = sharing.folder_password(shared)
             sharing.append(shared, "turn", {
@@ -445,8 +445,8 @@ class SealTests(unittest.TestCase):
                 "role": "user", "content_redacted": "주차는 B2", "raw_sha256": "t9",
                 "source_path": "p", "happened_at": "2026-11-01T09:00:00",
                 "known_at": "2026-11-01T09:00:00", "source_ordinal": 1})
-            os.environ["GRAPH_MIND_DEVICE"] = "laptop"
-            os.environ["GRAPH_MIND_CONFIG"] = str(root / "laptop.json")
+            os.environ["TURNBOOK_DEVICE"] = "laptop"
+            os.environ["TURNBOOK_CONFIG"] = str(root / "laptop.json")
             index = root / "laptop.sqlite"
             db = sharing._cursor_db(index)                  # an older version skipped them all
             log = shared / "log" / "desktop.jsonl"
@@ -461,7 +461,7 @@ class SealTests(unittest.TestCase):
 
 class OutboxTests(unittest.TestCase):
     def test_a_line_cut_off_in_the_outbox_does_not_swallow_the_next(self):
-        from graph_mind import sharing
+        from turnbook import sharing
 
         def down(url, lines):
             raise OSError("connection refused")
@@ -477,7 +477,7 @@ class OutboxTests(unittest.TestCase):
         sharing._HUB_DOWN.clear()
 
     def test_lines_wait_while_the_hub_is_down_and_go_with_the_next_append(self):
-        from graph_mind import sharing
+        from turnbook import sharing
         sent, hub_up = [], [False]
 
         def fake_append(url, lines):
@@ -501,7 +501,7 @@ class OutboxTests(unittest.TestCase):
         self.assertFalse(sharing._outbox().exists())
 
     def test_a_shared_folder_that_cannot_be_written_queues_the_turn(self):
-        from graph_mind import sharing
+        from turnbook import sharing
         with tempfile.TemporaryDirectory() as directory:
             shared = Path(directory)
             sharing._HUB_DOWN.clear()
@@ -520,7 +520,7 @@ class OutboxTests(unittest.TestCase):
 class NoPgserverTests(unittest.TestCase):
     def test_hosting_where_postgres_has_no_build_says_why(self):
         """A machine Postgres has no build for: a clear reason, and nothing downloaded."""
-        from graph_mind import sharing
+        from turnbook import sharing
         with (unittest.mock.patch("platform.machine", return_value="riscv64"),
               unittest.mock.patch("urllib.request.urlopen") as download):
             with self.assertRaisesRegex(RuntimeError, "not supported yet"):

@@ -1,10 +1,10 @@
-import _isolate  # noqa: F401  (first: never touch the real ~/.graph-mind)
+import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import tempfile
 import unittest
 
-from graph_mind.local_brain import LocalBrainStore
-from graph_mind.context_packet import build_context_pack, decide_recall
+from turnbook.local_brain import LocalBrainStore
+from turnbook.context_packet import build_context_pack, decide_recall
 
 
 T1 = "2026-09-16T10:00:00"

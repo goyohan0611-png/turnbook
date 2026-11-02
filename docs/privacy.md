@@ -32,7 +32,7 @@ Keep masking on if you use a cloud model: a recalled memory goes to your model's
 question, so a stored key would leave your PC the first time it is useful. To have Turnbook
 remember a key, tell it **where the key is**: *"my OpenAI key is in 1Password, under Dev"*. If your
 model runs on your own machines and you want keys remembered as typed, add
-`"mask_secrets": false` to `~/.graph-mind/config.json`.
+`"mask_secrets": false` to `~/.turnbook/config.json`.
 
 ## Deleting something
 
@@ -50,7 +50,7 @@ its free space; run `turnbook compact` once to rewrite the file without them.
 
 ## On disk
 
-The memory is SQLite under `~/.graph-mind/`, not encrypted: anyone who can read your user folder
+The memory is SQLite under `~/.turnbook/`, not encrypted: anyone who can read your user folder
 can read it (minus the masked secrets), just as they can read your AI app's own history. Protect it
 the way you protect that folder: a login password and disk encryption (BitLocker or Device
 Encryption on Windows, FileVault on macOS).
@@ -75,7 +75,7 @@ a [project brain](teams.md) instead.
 ## Seeing your memory
 
 `turnbook-view` opens your memory as a 3D graph in the browser (a local file,
-`~/.graph-mind/brain.html`; only the 3D library is fetched from a CDN). Use `--no-text` before you
+`~/.turnbook/brain.html`; only the 3D library is fetched from a CDN). Use `--no-text` before you
 screenshot or share it.
 
 Vulnerabilities: report privately (GitHub **Security → Report a vulnerability**); see
