@@ -5,10 +5,12 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 
 ## Unreleased
 
-- **The per-message floor holds memories found by words too.** A saved memory that shared only
-  everyday words with a message ("그러면", "이제") skipped the 0.36 floor and came along: a
-  price list on "그러면 이제 2번 약점 고치자". Such memories are now measured by meaning as
-  well (while the model is loading they stay as found).
+- **Saved memories on each message: only those that stand out.** Saved memories are short, and
+  on short Korean text every one scores 0.3-0.45 against any message, so the 0.36 floor (measured
+  on conversation turns) let a kiosk price list through, and memories sharing only everyday
+  words ("그러면", "이제") skipped it. A memory now goes in when it stands 0.2 above the mean of
+  all memories for that message (with fewer than 10 memories: the floor). On this PC's 32
+  memories: the answering memory stood 0.28+ above, the best unrelated one 0.17 at most.
 
 ## 1.1.0 — 2026-11-02
 What the agent did is remembered, the memory added to each message is held to a measured floor,

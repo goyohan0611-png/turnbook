@@ -77,33 +77,39 @@ class OpenCodeTests(unittest.TestCase):
                  {"turn_id": "c", "role": "user", "content": "kiosk price list",
                   "similarity": 0.3},
                  {"turn_id": "d", "role": "user", "content": "found by words"}]
-        memories = [{"title": "close", "similarity": 0.4}, {"title": "far", "similarity": 0.2},
-                    {"title": "by words", "score": 140}]
+        def memory(title):
+            return {"memory_id": title, "title": title, "content": ""}
+        found = [memory("price list"), memory("the answer")]
         seen = {}
 
         def pack(recalled, **_):
             seen.update(recalled)
             return {"status": "KNOWN", "context": "x"}
-        with mock.patch("turnbook.mcp_server.gather", lambda *a, **k: {
-                "status": "KNOWN", "conversation_turns": list(turns), "matches": list(memories)}), \
-                mock.patch("turnbook.context_packet.build_context_pack", pack), \
-                mock.patch("turnbook.local_embedder.LOCAL_MODEL",
-                           "onnx-community/embeddinggemma-300m-ONNX@onnx/model_q4.onnx"):
-            self.assertTrue(context("얼마나 걸리나", database="db", embedder=object()))
-        self.assertEqual([t["turn_id"] for t in seen["conversation_turns"]], ["b", "d"])
-        self.assertEqual([m["title"] for m in seen["matches"]], ["close", "by words"])
-        # with the model there, a memory found only by words is measured too
-        for similarity, kept in ((0.1, ["close"]), (0.5, ["close", "by words"])):
+
+        def run(query, others, scores):
             with mock.patch("turnbook.mcp_server.gather", lambda *a, **k: {
-                    "status": "KNOWN", "conversation_turns": [],
-                    "matches": list(memories)}), \
-                    mock.patch("turnbook.mcp_server.memory_meaning",
-                               lambda e, q, texts, s=similarity: [s] * len(texts)), \
+                    "status": "KNOWN", "conversation_turns": list(turns),
+                    "matches": list(found)}), \
+                    mock.patch("turnbook.inject._all_memories", lambda database: others), \
+                    mock.patch("turnbook.mcp_server.memory_meaning", lambda e, q, texts: None
+                               if scores is None else [scores.get(t.strip(), 0.3)
+                                                       for t in texts]), \
                     mock.patch("turnbook.context_packet.build_context_pack", pack), \
                     mock.patch("turnbook.local_embedder.LOCAL_MODEL",
                                "onnx-community/embeddinggemma-300m-ONNX@onnx/model_q4.onnx"):
-                context("그러면 이제 2번 약점 고치자", database="db", embedder=object())
-            self.assertEqual([m["title"] for m in seen["matches"]], kept)
+                context(query, database="db", embedder=object())
+            return [m["title"] for m in seen["matches"]]
+        # no model yet: memories as found; turns: the floor, no repeats, words-only kept
+        self.assertEqual(run("얼마나 걸리나", [], None), ["price list", "the answer"])
+        self.assertEqual([t["turn_id"] for t in seen["conversation_turns"]], ["b", "d"])
+        # among many memories, only one standing 0.2 above their mean (0.3 here) gets in, even
+        # one found by shared words ("그러면", "이제") at 0.43
+        many = [memory(f"other {i}") for i in range(12)]
+        self.assertEqual(run("그러면 이제 2번 약점 고치자", many,
+                             {"price list": 0.43, "the answer": 0.6}), ["the answer"])
+        # with few memories there is no "rest": the floor (0.36)
+        self.assertEqual(run("그러면 이제 2번 약점 고치자", [],
+                             {"price list": 0.34, "the answer": 0.4}), ["the answer"])
 
     def test_a_message_with_no_sign_of_the_past_gets_nothing(self):
         self.assertEqual(context("write a quicksort in rust"), "")

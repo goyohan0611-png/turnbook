@@ -33,20 +33,38 @@ def _kept(items, floor):
     return [i for i in items if i.get("similarity") is None or i["similarity"] >= floor]
 
 
-def _measured(query, memories, embedder):
-    """Memories found by shared words get a similarity too, so the floor holds them as well:
-    "그러면" and "이제" brought a kiosk price list to "그러면 이제 2번 약점 고치자". Without the
-    model (still loading) they stay as found."""
-    unmeasured = [m for m in memories if m.get("similarity") is None]
-    if not unmeasured:
+# Saved memories are short, and on short Korean text every memory scores 0.3-0.45 against any
+# message, so the turns' floor let a price list through. What told them apart (this PC's 32
+# memories, 6 questions they answer, 8 they do not) is how far one stands above the rest for the
+# same message: the answering one 0.28 or more above their mean, the best unrelated one 0.17 at
+# most. With few memories there is no "rest": the floor then.
+STANDS_OUT, FEW = 0.2, 10
+
+
+def _all_memories(database):
+    from turnbook.local_brain import LocalBrainStore
+    from turnbook.mcp_server import _now
+    with LocalBrainStore(database) as store:
+        # ponytail: the 50 newest stand for "the rest"; recall stops there
+        return store.recall("memory", as_of=_now(), limit=50, recent=True)["matches"]
+
+
+def _standing_out(query, memories, embedder, database, floor):
+    """The memories found (by words or meaning) that stand out from all of them for this
+    message: "그러면" and "이제" brought a kiosk price list to "그러면 이제 2번 약점 고치자".
+    Without the model (still loading) they stay as found."""
+    if not memories:
         return memories
     from turnbook.mcp_server import memory_meaning
+    pool = {m["memory_id"]: m for m in [*_all_memories(database), *memories]}
     scores = memory_meaning(embedder, query, [m.get("title", "") + "\n" + m.get("content", "")
-                                              for m in unmeasured])
+                                              for m in pool.values()])
     if not scores:
         return memories
-    measured = {id(m): s for m, s in zip(unmeasured, scores)}
-    return [{**m, "similarity": measured[id(m)]} if id(m) in measured else m for m in memories]
+    similarity = dict(zip(pool, scores))
+    bar = (sum(scores) / len(scores) + STANDS_OUT) if len(scores) >= FEW else floor
+    return [{**m, "similarity": similarity[m["memory_id"]]} for m in memories
+            if similarity[m["memory_id"]] >= bar]
 
 
 def _echo(text, said):
@@ -86,7 +104,8 @@ def context(query: str, *, database=None, embedder=None) -> str:
                       share=False)
     floor = HOOK_FLOORS.get(LOCAL_MODEL, 0.0)
     if floor:
-        recalled["matches"] = _measured(query, recalled.get("matches", []), embedder)
+        recalled["matches"] = _standing_out(query, recalled.get("matches", []), embedder,
+                                            database, floor)
     # an earlier message with (nearly) these letters says nothing new: "했어" brought back four
     # older "했어", "얼마나 걸리나" four "얼마나 걸려" (and the message itself, once stored).
     # Letters only, no judgement of meaning.
@@ -95,7 +114,7 @@ def context(query: str, *, database=None, embedder=None) -> str:
         [turn for turn in recalled.get("conversation_turns", [])
          if turn.get("role") != "user" or not _echo(turn.get("content", ""), said)],
         floor)[:LIMIT]
-    recalled["matches"] = _kept(recalled.get("matches", []), floor)[:LIMIT]
+    recalled["matches"] = recalled.get("matches", [])[:LIMIT]
     if not recalled["matches"] and not recalled["conversation_turns"]:
         return ""
     packet = build_context_pack(recalled, max_chars=CHARS, short_sources=True)
