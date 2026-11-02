@@ -54,6 +54,26 @@ def read_timeline(db_path, limit, with_text):
         db.close()
 
 
+def read_work(db_path, with_text, limit=20):
+    """The brain's unfinished work (brain_work), newest first: what it is doing right now."""
+    if not with_text:
+        return []
+    db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        if not db.execute("SELECT 1 FROM sqlite_master WHERE name='work_items'").fetchone():
+            return []
+        # the packet itself says whether it is open: a first-prototype table, not yet upgraded
+        # by WorkState (this page only reads), has no is_open/updated_at columns
+        packets = [json.loads(row[0]) for row in db.execute("SELECT packet FROM work_items")]
+        packets = sorted((p for p in packets if p.get("state") in {"ACTIVE", "READY", "PAUSED"}),
+                         key=lambda p: p.get("updated_at", ""), reverse=True)[:limit]
+        keep = ("workspace", "task", "state", "owner", "assigned_to", "objective",
+                "next_action", "summary", "depends_on", "updated_at", "taken_over")
+        return [{k: v for k, v in p.items() if k in keep} for p in packets]
+    finally:
+        db.close()
+
+
 def _graph(db, limit, with_text):
     tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if "associative_engrams" not in tables:
@@ -189,6 +209,11 @@ button:hover { border-color:#4d96ff; } :focus-visible { outline:2px solid #4d96f
 #timeline input,#timeline select { font:inherit; color:var(--fg); background:#05060a; border:1px solid #343d50; border-radius:5px; padding:8px; }
 #timeline .work-filter { flex-direction:row; align-items:center; align-self:flex-end; min-height:36px; }
 #timeline-count { color:var(--dim); font-size:12px; margin:4px 0 12px; }
+#work-now:empty { display:none; }
+#work-now { border:1px solid #2ec4b6; border-radius:6px; padding:8px 12px; margin:4px 0 10px;
+  max-height:30vh; overflow:auto; }
+#work-now h3 { margin:0 0 6px; font-size:13px; color:#2ec4b6; }
+#work-now div { margin:6px 0; font-size:13px; } #work-now b { color:#c9d7ee; }
 #timeline-list { overflow:auto; flex:1; min-height:0; padding-right:8px; }
 #timeline details { border-top:1px solid #30384a; padding:12px 0; }
 #timeline summary { cursor:pointer; font-weight:600; color:#c9d7ee; }
@@ -207,6 +232,7 @@ button:hover { border-color:#4d96ff; } :focus-visible { outline:2px solid #4d96f
 <div class="filters"><label class="search">Search<input id="timeline-query" type="search" placeholder="A decision, file or conversation"></label>
 <label>Project<select id="timeline-scope"><option value="">All projects</option></select></label>
 <label class="work-filter"><input id="timeline-work" type="checkbox">Work only</label></div>
+<div id="work-now"></div>
 <p id="timeline-count" aria-live="polite"></p><div id="timeline-list"></div>
 </section>
 <button id="spin">Pause rotation</button>
@@ -226,6 +252,21 @@ const query = document.getElementById("timeline-query"), scope = document.getEle
 const workOnly = document.getElementById("timeline-work"), list = document.getElementById("timeline-list");
 for (const name of [...new Set(DATA.timeline.map(t => t.scope))].sort()) {
   const option = document.createElement("option"); option.value = name; option.textContent = name; scope.append(option);
+}
+function renderWork() {
+  const box = document.getElementById("work-now"); box.replaceChildren();
+  const tasks = DATA.work || [];
+  if (!tasks.length) return;
+  const h = document.createElement("h3"); h.textContent = "Work in progress"; box.append(h);
+  for (const w of tasks) {
+    const row = document.createElement("div"), name = document.createElement("b"), rest = document.createElement("span");
+    const who = w.state === "ACTIVE" ? `${w.owner} working` : `${w.state.toLowerCase()} for ${w.assigned_to || "any"}`;
+    name.textContent = `${w.task} `;
+    rest.textContent = `· ${who} · ${w.objective || ""}` + (w.next_action ? ` → next: ${w.next_action}` : "") +
+      (w.depends_on && w.depends_on.length ? ` (after ${w.depends_on.join(", ")})` : "") +
+      (w.taken_over ? ` · continued from ${w.taken_over.from}` : "") + ` · ${w.workspace}`;
+    row.append(name, rest); box.append(row);
+  }
 }
 function renderTimeline(cap=100) {
   const q = query.value.trim().toLocaleLowerCase();
@@ -255,6 +296,7 @@ function renderTimeline(cap=100) {
   if (!matched.length && DATA.textIncluded) { const p=document.createElement("p"); p.textContent="No matching turns in this snapshot."; list.append(p); }
   if (matched.length > cap) { const more=document.createElement("button"); more.textContent="Show 100 more"; more.onclick=()=>renderTimeline(cap+100); list.append(more); }
 }
+renderWork();
 function showTimeline(show) {
   timeline.hidden = !show; openTimeline.setAttribute("aria-expanded", String(show));
   document.body.classList.toggle("timeline-open", show);
@@ -368,7 +410,8 @@ def build(db_path, out, *, limit=4000, with_text=True, inline_library=True) -> d
             region["words"] = []
     since = min((n["when"] for n in nodes if n["when"]), default="")[:10]
     data = {"nodes": nodes, "links": links, "regions": legend, "since": since,
-            "timeline": read_timeline(db_path, limit, with_text), "textIncluded": with_text}
+            "timeline": read_timeline(db_path, limit, with_text),
+            "work": read_work(db_path, with_text), "textIncluded": with_text}
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     page = PAGE.replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("<", "\\u003c"))

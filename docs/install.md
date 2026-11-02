@@ -144,7 +144,7 @@ provides the tools, while `turnbook-install` adds capture and per-message memory
 | `brain_forget` | "delete the password I typed": lists masked candidates, deletes only what you pick, everywhere |
 | `code_activity` | what changed in a project, file or symbol, and when (when a code folder is watched) |
 | `brain_checkpoint` | [project brains](teams.md), for teams that use them |
-| `brain_work` (unreleased prototype) | local task assignment, progress and handover between connected agents; [protocol and limits](design/agent-continuity.md) |
+| `brain_work` (unreleased prototype) | the brain's current work, shared by interchangeable workers (apps or sessions); [protocol and limits](design/agent-continuity.md) |
 
 Few tools on purpose: every tool's description is read by the model on every turn, and similar
 tools get confused with each other.

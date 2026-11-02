@@ -15,6 +15,96 @@ from turnbook.work_state import WorkState, workspace_key
 
 
 class WorkStateTests(unittest.TestCase):
+    def test_the_user_can_continue_stopped_work_in_another_app(self):
+        """Claude stops mid-task (a usage limit): it cannot pause. When the user asks Codex to
+        continue, Codex takes it over with its progress, but only once Claude has been quiet,
+        and never without the user's words."""
+        from datetime import datetime, timedelta
+        from turnbook.conversation_memory import ConversationMemoryStore
+        with tempfile.TemporaryDirectory() as folder:
+            database = Path(folder) / "brain.sqlite"
+            transcript = Path(folder) / "claude-session.jsonl"
+            transcript.write_text("{}\n", encoding="utf-8")
+            with ConversationMemoryStore(database) as store:
+                store.record({"turn_id": "t", "client": "claude-code",
+                              "client_session_id": "s1", "scope": "global", "role": "assistant",
+                              "content_redacted": "Did:\nedited login.py", "raw_sha256": "t",
+                              "source_path": str(transcript), "source_ordinal": 1,
+                              "happened_at": datetime.now().isoformat(),
+                              "known_at": datetime.now().isoformat()})
+            with WorkState(database) as work:
+                work.change("claim", "C:/project", agent="claude-code:s1",
+                            expected_revision=0, objective="Fix sign in")
+                work.change("checkpoint", "C:/project", agent="claude-code:s1",
+                            expected_revision=1, summary="login.py fixed",
+                            next_action="run the tests")
+                ask = "codex에서 이어서 해줘"
+                # no user request: never
+                self.assertEqual(work.change("claim", "C:/project", agent="codex:x",
+                                             expected_revision=2)["reason"],
+                                 "OWNER_STILL_ACTIVE")
+                # the user asked, but Claude was just working (its transcript is fresh)
+                self.assertEqual(work.change("claim", "C:/project", agent="codex:x",
+                                             expected_revision=2, takeover=ask)["reason"],
+                                 "OWNER_RECENTLY_ACTIVE")
+                with mock.patch.object(WorkState, "_quiet_for",
+                                       lambda self, owner, packet: timedelta(minutes=10)):
+                    with self.assertRaises(ValueError):          # only claim takes it over
+                        work.change("checkpoint", "C:/project", agent="codex:x",
+                                    expected_revision=2, takeover=ask)
+                    self.assertEqual(work.change("claim", "C:/project", agent="codex:x",
+                                                 expected_revision=2, objective="restart",
+                                                 takeover=ask)["reason"],
+                                     "OBJECTIVE_IS_INHERITED")
+                    taken = work.change("claim", "C:/project", agent="codex:x",
+                                        expected_revision=2, takeover=ask)
+                self.assertEqual(taken["status"], "OK")
+                self.assertEqual(taken["work"]["summary"], "login.py fixed")
+                self.assertEqual(taken["work"]["next_action"], "run the tests")
+                self.assertEqual(taken["work"]["taken_over"]["from"], "claude-code:s1")
+                self.assertEqual(taken["work"]["taken_over"]["because"], ask)
+                # the old owner coming back finds it is no longer its work
+                self.assertEqual(work.change("checkpoint", "C:/project",
+                                             agent="claude-code:s1",
+                                             expected_revision=3)["reason"],
+                                 "NOT_ACTIVE_OWNER")
+
+    def test_quiet_reads_the_owners_transcript_and_turns(self):
+        import os
+        from datetime import datetime, timedelta, timezone
+        from turnbook.conversation_memory import ConversationMemoryStore
+        with tempfile.TemporaryDirectory() as folder:
+            database = Path(folder) / "brain.sqlite"
+            transcript = Path(folder) / "t.jsonl"
+            transcript.write_text("{}\n", encoding="utf-8")
+            long_ago = (datetime.now() - timedelta(hours=1)).isoformat()
+            with ConversationMemoryStore(database) as store:
+                store.record({"turn_id": "t", "client": "claude-code",
+                              "client_session_id": "s1", "scope": "global", "role": "user",
+                              "content_redacted": "hi", "raw_sha256": "t",
+                              "source_path": str(transcript), "source_ordinal": 1,
+                              "happened_at": long_ago, "known_at": long_ago})
+            old = {"updated_at": (datetime.now(timezone.utc)
+                                  - timedelta(hours=1)).isoformat()}
+            with WorkState(database) as work:
+                # the transcript was written just now: a tool call is still running
+                self.assertLess(work._quiet_for("claude-code:s1", old), timedelta(minutes=1))
+                stale = (datetime.now(timezone.utc) - timedelta(minutes=30)).timestamp()
+                os.utime(transcript, (stale, stale))
+                self.assertGreater(work._quiet_for("claude-code:s1", old),
+                                   timedelta(minutes=29))
+                # no way to tell, so silence proves nothing: no session, a session not captured
+                # yet, an app whose files do not log tool calls, a transcript that is gone
+                for owner in ("codex", "codex:unseen", "gemini-cli:s1", "opencode:s1"):
+                    self.assertIsNone(work._quiet_for(owner, old), owner)
+                transcript.unlink()
+                self.assertIsNone(work._quiet_for("claude-code:s1", old))
+                work.change("claim", "C:/p", agent="gemini-cli:s1", expected_revision=0,
+                            objective="x")
+                self.assertEqual(work.change("claim", "C:/p", agent="codex:x",
+                                             expected_revision=1, takeover="이어서 해")["reason"],
+                                 "OWNER_ACTIVITY_UNKNOWN")
+
     def test_handover_survives_connections_and_preserves_the_packet(self):
         with tempfile.TemporaryDirectory() as folder:
             database = Path(folder) / "brain.sqlite"

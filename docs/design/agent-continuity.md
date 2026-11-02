@@ -49,6 +49,16 @@ No implicit global project, relative paths or cross-project fallback are accepte
    and checks. A recorded "passed" is a report, not proof that the current files still pass.
 5. `pause`: relinquish the work with a next action; optionally name the next app. By default
    any connected agent may claim it. An old timestamp alone never permits taking active work.
+   **A worker that stopped without pausing** (a usage limit, a closed app) still holds its work.
+   When the user asks another app to continue it, that app claims with `takeover` set to the
+   user's words. It succeeds only after the owner has been quiet for 5 minutes: no checkpoint,
+   no captured turn and no write to its transcript file (apps write on every tool call). The
+   progress, next action and checks carry over; the packet records who it was taken from and
+   why. An agent never takes over on its own initiative or on a timer, and the automatic
+   launcher (when built) never does.
+   Only owners whose app logs every tool call to its own transcript (Claude Code, Cowork,
+   Codex) can be shown quiet; for others, or a session not captured yet, the claim answers
+   `OWNER_ACTIVITY_UNKNOWN` and the owner has to pause.
 6. `complete`: the active owner marks it complete. A dependent task cannot complete against a
    dependency revision different from the one it claimed; pause, reclaim and recheck instead.
    This also checks transitive inputs: a completed review becomes stale if its implementation
@@ -79,7 +89,7 @@ Claude Code reads and claims `verify`, checks the referenced changes and records
 No agent launch is implied by assignment: an adapter must deliver/wake the recipient, or the
 recipient picks up its work the next time it runs.
 
-## Session handover
+## Session continuity
 
 Claude Code and Codex installed hooks now handle SessionStart (`startup` / `clear` only). Up to
 two unfinished local work packets and a short tail of the previous conversation in the same

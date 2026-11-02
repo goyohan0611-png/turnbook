@@ -1,11 +1,13 @@
-"""A local work baton: context survives an agent, but an active owner is never timed out.
+"""Shared work state of the one brain: the work survives any one worker (app or session).
 
-This is cooperative coordination between apps using the SAME local store, not a process lock,
-an agent launcher, or a distributed lease. Revision checks serialize competing handovers.
+An active owner is never timed out. Another worker continues it only when the user asks for
+that, and only after the owner has gone quiet (`takeover`). This is cooperative coordination
+between apps using the SAME local store, not a process lock, an agent launcher, or a
+distributed lease. Revision checks serialize competing claims.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import json
 import ntpath
@@ -105,11 +107,44 @@ class WorkState:
                                (workspace_key(workspace), max(1, min(limit, 100))))
         return [json.loads(row[0]) for row in rows]
 
+    TAKEOVER_QUIET = timedelta(minutes=5)
+    # apps whose own transcript gets a line on every tool call: its file's age shows whether the
+    # session still works. Gemini CLI's and OpenCode's files are written by Turnbook's hooks for
+    # messages only, so a long tool run there looks quiet.
+    LIVE_TRANSCRIPTS = {"claude-code", "claude-cowork", "codex"}
+
+    def _quiet_for(self, owner, packet):
+        """How long the owner has shown no sign of work, or None when that cannot be told: its
+        last checkpoint, its session's last captured turn, and that session's transcript file.
+        Without the file (an app that does not log tool calls, a session not captured yet,
+        an owner without a session) silence proves nothing."""
+        app, _, session = owner.partition(":")
+        if app not in self.LIVE_TRANSCRIPTS or not session or not self.db.execute(
+                "SELECT 1 FROM sqlite_master WHERE name='conversation_turns'").fetchone():
+            return None
+        row = self.db.execute(
+            "SELECT happened_at, source_path FROM conversation_turns WHERE client=? AND "
+            "client_session_id=? ORDER BY happened_at DESC LIMIT 1", (app, session)).fetchone()
+        try:
+            written = datetime.fromtimestamp(Path(row[1]).stat().st_mtime, timezone.utc)
+        except (OSError, TypeError, ValueError):
+            return None
+        times = [datetime.fromisoformat(packet["updated_at"]), written,
+                 datetime.fromisoformat(row[0]).astimezone()]          # stored local time
+        return datetime.now(timezone.utc) - max(times)
+
     def change(self, action, workspace, *, agent, expected_revision, objective=None,
                summary=None, next_action=None, references=None, checks=None, task="main",
-               assigned_to=None, depends_on=None):
+               assigned_to=None, depends_on=None, takeover=None):
+        """`takeover`: the user's own words asking this agent to continue work another one
+        holds (it stopped: a usage limit, a closed app). Only for claim, and only once the owner
+        has been quiet TAKEOVER_QUIET; never on a timer or an agent's own initiative."""
         key = workspace_key(workspace)
         task = task_key(task)
+        if takeover is not None:
+            takeover = _text(takeover, 500)
+            if action != "claim" or not takeover:
+                raise ValueError("takeover is the user's request, and only for claim")
         if action not in {"assign", "claim", "checkpoint", "pause", "complete", "clear"}:
             raise ValueError("Unknown work action")
         if type(expected_revision) is not int or expected_revision < 0:
@@ -140,11 +175,21 @@ class WorkState:
             before = json.loads(row[0]) if row else None
             revision = before["revision"] if before else 0
             reason = None
+            taken_from = None
             if expected_revision != revision:
                 reason = "REVISION_CHANGED"
             elif action in {"claim", "assign"}:
                 if before and before["state"] == "ACTIVE":
-                    reason = "OWNER_STILL_ACTIVE"
+                    quiet = (self._quiet_for(before["owner"], before)
+                             if takeover and before["owner"] != agent else None)
+                    if not takeover or before["owner"] == agent:
+                        reason = "OWNER_STILL_ACTIVE"
+                    elif quiet is None:
+                        reason = "OWNER_ACTIVITY_UNKNOWN"   # it must pause, or be closed
+                    elif quiet < self.TAKEOVER_QUIET:
+                        reason = "OWNER_RECENTLY_ACTIVE"
+                    else:
+                        taken_from = before["owner"]
                 elif action == "assign" and before and before["state"] in {"READY", "PAUSED"}:
                     reason = "TASK_ALREADY_ASSIGNED"
                 elif action == "assign" and not target:
@@ -168,6 +213,8 @@ class WorkState:
                     "next_action", (before or {}).get("next_action")):
                 reason = "NEXT_ACTION_REQUIRED"
             continuing = before and before["state"] in {"ACTIVE", "PAUSED", "READY"}
+            if taken_from and not reason and patch.get("objective"):
+                reason = "OBJECTIVE_IS_INHERITED"     # a takeover continues, it does not restart
             if not reason and continuing and depends_on is not None:
                 reason = "DEPENDENCIES_ARE_FIXED"
             dependencies = (before or {}).get("depends_on", []) if continuing \
@@ -217,7 +264,8 @@ class WorkState:
                         "revision": revision, "work": before}
 
             fresh = action == "clear" or not before or (
-                action in {"claim", "assign"} and before["state"] not in {"PAUSED", "READY"})
+                action in {"claim", "assign"} and before["state"] not in {"PAUSED", "READY"}
+                and not taken_from)
             packet = ({"objective": "", "summary": "", "next_action": "",
                        "references": [], "checks": [], "depends_on": [],
                        "dependency_revisions": {}, "assigned_to": "any"}
@@ -228,6 +276,11 @@ class WorkState:
                 packet["assigned_to"] = target or "any"
             if action == "claim":
                 packet["dependency_revisions"] = dependency_revisions
+                packet.pop("taken_over", None)
+                if taken_from:
+                    packet["taken_over"] = {
+                        "from": taken_from, "because": takeover,
+                        "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
             packet.update(workspace=workspace, task=task, revision=revision + 1,
                           state={"assign": "READY", "claim": "ACTIVE", "checkpoint": "ACTIVE",
                                  "pause": "PAUSED", "complete": "COMPLETE",
