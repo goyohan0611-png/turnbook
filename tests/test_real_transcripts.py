@@ -2,10 +2,12 @@
 files, content made up): only what a person typed and what the assistant answered is stored.
 Each record carries its own marker word; the test says which markers must and must not be found.
 The fixtures that earlier tests missed were exactly these shapes: a compaction summary sent as a
-"user" record, a Codex heartbeat, an app's page state."""
+"user" record, a Codex heartbeat, an app's page state. What the agent did (files edited,
+commands run) is kept as one "Did:" line per stretch of work; reads and tool output are not."""
 import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
 from pathlib import Path
 import json
+import os
 import tempfile
 import unittest
 
@@ -31,7 +33,12 @@ def claude_records():
         rec("assistant", 3, **msg("assistant", [
             {"type": "thinking", "thinking": "DROPthinking"},
             {"type": "text", "text": "KEEPanswer 금요일로 잡을게요"},
-            {"type": "tool_use", "name": "Bash", "input": {"command": "DROPtooluse"}}])),
+            {"type": "tool_use", "name": "Bash",
+             "input": {"command": "KEEPtooluse --x\nDROPline2"}}])),
+        rec("assistant", 31, **msg("assistant", [
+            {"type": "tool_use", "name": "Read", "input": {"file_path": "DROPread"}},
+            {"type": "tool_use", "name": "Edit", "input": {"file_path": "C:/KEEPedited.py",
+                                                         "old_string": "DROPold"}}])),
         rec("user", 4, **msg("user", [{"type": "tool_result", "content": "DROPtoolresult"}])),
         rec("user", 5, isMeta=True, **msg("user", "DROPmeta caveat")),
         rec("user", 6, isSidechain=True, **msg("user", "DROPsidechain subagent")),
@@ -79,6 +86,14 @@ def codex_records():
             "content": [{"type": "output_text", "text": "KEEPcodexanswer 재시작 확인했어요"}]}},
         {"type": "response_item", "ordinal": 8, "timestamp": T, "payload": {
             "type": "function_call", "name": "shell", "arguments": "DROPfunctioncall"}},
+        {"type": "response_item", "ordinal": 81, "timestamp": T, "payload": {
+            "type": "custom_tool_call", "name": "exec", "input":
+            'text(await tools.exec_command({cmd:"KEEPexec -q",max_output_tokens:100}));'
+            'text(await tools.apply_patch("*** Begin Patch\\n*** Update File: KEEPpatched.py'
+            '\\n@@\\n-DROPpatchline\\n*** End Patch"));'}},
+        {"type": "response_item", "ordinal": 82, "timestamp": T, "payload": {
+            "type": "function_call", "name": "shell", "arguments": json.dumps(
+                {"command": ["bash", "-lc", "KEEPshellarray"]})}},
         {"type": "response_item", "ordinal": 9, "timestamp": T, "payload": {
             "type": "reasoning", "summary": [{"type": "summary_text", "text": "DROPreasoning"}]}},
         {"type": "compacted", "timestamp": T, "payload": {"message": "DROPcompacted"}},
@@ -102,6 +117,7 @@ def stored(capture_class, records, folder_name):
             with transcript.open("a", encoding="utf-8") as handle:
                 for record in records:
                     handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+            os.utime(transcript, (1, 1))   # quiet long ago: its last tool calls are kept
             capture.scan()
             return " ".join(row[0] for row in store.db.execute(
                 "SELECT content_redacted FROM conversation_turns"))
@@ -110,7 +126,7 @@ def stored(capture_class, records, folder_name):
 class RealShapes(unittest.TestCase):
     def check(self, text, records):
         markers = {word for record in records for word in json.dumps(record, ensure_ascii=False)
-                   .replace('"', " ").replace("<", " ").replace(">", " ").split()
+                   .replace('"', " ").replace("<", " ").replace(">", " ").replace("\\", " ").split()
                    if word.startswith(("KEEP", "DROP"))}
         kept = sorted(m for m in markers if m.startswith("KEEP") and m not in text)
         leaked = sorted(m for m in markers if m.startswith("DROP") and m in text)
@@ -124,6 +140,36 @@ class RealShapes(unittest.TestCase):
     def test_codex(self):
         records = codex_records()
         self.check(stored(CodexConversationCapture, records, "sessions"), records)
+
+    def test_a_stretch_of_work_is_one_line_once_the_agent_stops(self):
+        """Tool calls after the last reply wait while the transcript is still being written,
+        then are stored once, as one turn."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "projects").mkdir()
+            transcript = root / "projects" / "s.jsonl"
+            transcript.write_text("", encoding="utf-8")
+            with ConversationMemoryStore(root / "brain.sqlite") as store:
+                capture = ClaudeCodeConversationCapture(root / "projects", store,
+                                                        state_path=root / "cursor.json")
+                capture.initialize_baseline()
+
+                def call(n, command):
+                    return json.dumps({"type": "assistant", "uuid": f"a{n}", "timestamp": T,
+                                       "message": {"role": "assistant", "content": [
+                                           {"type": "tool_use", "name": "Bash",
+                                            "input": {"command": command}}]}}) + "\n"
+                with transcript.open("a", encoding="utf-8") as handle:
+                    handle.write(call(1, "pytest"))
+                self.assertEqual(capture.scan()["recorded_turns"], 0)   # still working
+                with transcript.open("a", encoding="utf-8") as handle:
+                    handle.write(call(2, "git status"))
+                os.utime(transcript, (1, 1))
+                self.assertEqual(capture.scan()["recorded_turns"], 1)
+                self.assertEqual(capture.scan()["recorded_turns"], 0)
+                rows = [r[0] for r in store.db.execute(
+                    "SELECT content_redacted FROM conversation_turns")]
+        self.assertEqual(rows, ["Did:\nran: pytest\nran: git status"])
 
     def test_a_block_nobody_knows_yet_is_kept_and_counted(self):
         """An app's next new block is not dropped by a guess; the capture status counts it,

@@ -15,13 +15,13 @@ from turnbook.conversation_memory import (ConversationMemoryStore, CopilotConver
                                             CursorConversationCapture, HookConversationCapture)
 
 
-def run(agent, event, payload):
+def run(agent, event, payload, *extra):
     out = io.StringIO()
     out.reconfigure = lambda **_: None
     stdin = io.StringIO(json.dumps(payload))
     stdin.reconfigure = lambda **_: None
     with mock.patch("sys.stdin", stdin), mock.patch("sys.stdout", out):
-        hook.main([agent, event])
+        hook.main([agent, event, *extra])
     return json.loads(out.getvalue())
 
 
@@ -275,6 +275,22 @@ class HookTests(unittest.TestCase):
             self.assertFalse(hook.hooks_root().exists())                # nothing saved
         with mock.patch("turnbook.inject.context", lambda text: ""):
             self.assertEqual(run("codex", "UserPromptSubmit", {"prompt": "hi"}), {})
+
+    def test_the_plugin_hook_steps_aside_for_the_installers(self):
+        """The Claude Code plugin's hook adds the memory, unless turnbook-install's hook is in
+        ~/.claude/settings.json too: then once is enough."""
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.object(Path, "home", lambda: Path(directory)), \
+                mock.patch("turnbook.inject.context", lambda text: "MEMORY"):
+            prompt = {"prompt": "where?"}
+            self.assertIn("hookSpecificOutput",
+                          run("claude-code", "UserPromptSubmit", prompt, "plugin"))
+            (Path(directory) / ".claude").mkdir()
+            (Path(directory) / ".claude" / "settings.json").write_text(
+                '{"hooks": {"UserPromptSubmit": [{"command": "py -m turnbook.hook"}]}}',
+                encoding="utf-8")
+            self.assertEqual(run("claude-code", "UserPromptSubmit", prompt, "plugin"), {})
+            self.assertIn("hookSpecificOutput", run("claude-code", "UserPromptSubmit", prompt))
 
     def test_the_message_hook_does_not_wait_on_the_shared_hub(self):
         """The memory servers pull other devices' lines; a hub connection per message added

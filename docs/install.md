@@ -28,6 +28,20 @@ pip install turnbook
 turnbook-install
 ```
 
+## Claude Code plugin
+
+If Claude Code is the only app and [uv](https://docs.astral.sh/uv/) is on your PATH:
+
+```
+/plugin install turnbook --marketplace goyohan0611-png/turnbook
+```
+
+(or `claude plugin marketplace add goyohan0611-png/turnbook` and
+`claude plugin install turnbook@turnbook` in a shell). The plugin runs the memory server and the
+message hook through `uvx`; the server starts the capture service. It does not add the login item
+or connect other apps: `turnbook-install` does. With both, the installer's hook adds the memory
+and the plugin's stays quiet.
+
 ## Careful install: read first, pin a version
 
 The one-step commands run a script straight from GitHub, and that script runs uv's own installer.

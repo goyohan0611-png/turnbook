@@ -46,6 +46,7 @@ turnbook-capture = "turnbook.capture_cli:main"
 turnbook-forget = "turnbook.forget:main"
 turnbook-view = "turnbook.memory_view:main"
 turnbook-hub = "turnbook.project_brains:hub_main"
+turnbook-hook = "turnbook.hook:main"
 # the names before 0.9.44, still in apps' configs, hooks and Startup entries
 graph-mind = "turnbook.mcp_server:main"
 graph-mind-install = "turnbook.install:main"

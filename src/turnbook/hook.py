@@ -13,6 +13,7 @@ never stand in the way of a message.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 import json
 import os
 import sys
@@ -133,8 +134,21 @@ def reply(agent: str, event_name: str, text: str | None, event: dict | None = No
     return {"hookSpecificOutput": {"hookEventName": event_name, "additionalContext": memory}}
 
 
+def _installer_hook() -> bool:
+    """Whether ~/.claude/settings.json holds turnbook-install's hook (the plugin's runs too)."""
+    try:
+        text = (Path.home() / ".claude" / "settings.json").read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return "turnbook.hook" in text or "graph_mind.hook" in text
+
+
 def main(argv=None) -> None:
-    agent, event_name = (argv if argv is not None else sys.argv[1:])[:2]
+    args = argv if argv is not None else sys.argv[1:]
+    agent, event_name = args[:2]
+    if args[2:3] == ["plugin"] and _installer_hook():
+        sys.stdout.write("{}")          # turnbook-install's hook adds the memory already
+        return
     text = None
     try:
         sys.stdin.reconfigure(encoding="utf-8", errors="replace")

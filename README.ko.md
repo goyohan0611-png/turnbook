@@ -58,6 +58,12 @@ Python이 없어도 되고, 따로 설정할 것도 없습니다. 설치 후 AI 
 있다면 `pip install turnbook && turnbook-install`. 스크립트를 먼저 읽어 보고 버전을 고정해서
 설치하고 싶다면: [신중한 설치](docs/install.md#careful-install-read-first-pin-a-version)
 
+클로드 코드만 쓰고 [uv](https://docs.astral.sh/uv/)가 깔려 있다면 플러그인으로도 됩니다:
+
+```
+/plugin install turnbook --marketplace goyohan0611-png/turnbook
+```
+
 <details>
 <summary>MCP 클라이언트에 직접 연결하기</summary>
 

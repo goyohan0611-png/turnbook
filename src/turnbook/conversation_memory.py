@@ -181,6 +181,49 @@ def _redact(value, *, preserve_source=False):
     return (cleaned if preserve_source else cleaned.strip()), count + found[0]
 
 
+# a patch names each file it touches; in code mode's JavaScript the patch's newlines are "\n"
+PATCHED = re.compile(r'\*\*\* (?:Add|Update|Delete) File: (.+?)(?=\\n|\n|"|$)', re.M)
+JS_CMD = re.compile(r"""\bcmd\s*:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')""")
+SHELL_FLAGS = {"-c", "-lc", "-Command", "/c"}
+
+
+def _ran(command):
+    lines = command.strip().splitlines()
+    return "ran: " + lines[0].strip()[:200] if lines else ""
+
+
+def _codex_actions(text):
+    """Codex's calls: JSON arguments ({"cmd": ...} or {"command": [...]}), or code mode's
+    JavaScript calling tools.exec_command({cmd: "..."}); patches name their files."""
+    done = []
+    try:
+        given = json.loads(text)
+    except ValueError:
+        given = None
+    if isinstance(given, dict):
+        command = given.get("cmd") or given.get("command")
+        if isinstance(command, list) and all(isinstance(part, str) for part in command):
+            command = " ".join(command[2:] if command[1:2] and command[1] in SHELL_FLAGS
+                               else command)
+        if isinstance(command, str):
+            done.append(_ran(command))
+    else:
+        for quoted in JS_CMD.findall(text):
+            try:
+                done.append(_ran(json.loads(quoted) if quoted[0] == '"' else quoted[1:-1]))
+            except ValueError:
+                continue
+    done += ["edited " + path.strip() for path in PATCHED.findall(text)]
+    return [line for line in done if line]
+
+
+def _did(lines):
+    """One turn for a stretch of tool calls: what was done, in order, each once."""
+    lines = list(dict.fromkeys(lines))
+    more = f"\n(+{len(lines) - 40} more)" if len(lines) > 40 else ""
+    return "Did:\n" + "\n".join(lines[:40]) + more
+
+
 def _message_text(payload):
     content = payload.get("content")
     if isinstance(content, str):
@@ -578,6 +621,16 @@ class CodexConversationCapture:
         """What makes this record the same record on every scan. Codex numbers its records."""
         return ordinal
 
+    ACTIONS_SETTLE = 120       # seconds a transcript is quiet before its last tool calls are kept
+
+    def _actions(self, item):
+        """What a Codex tool call did, as short lines: edited <path>, ran: <command>."""
+        payload = item.get("payload") or {}
+        if (item.get("type") != "response_item"
+                or payload.get("type") not in {"function_call", "custom_tool_call"}):
+            return []
+        return _codex_actions(str(payload.get("input") or payload.get("arguments") or ""))
+
     def _message(self, item):
         """(role, text) when this record is something a person or the assistant said, else None."""
         payload = item.get("payload") or {}
@@ -679,14 +732,53 @@ class CodexConversationCapture:
             key = str(path)
             start = int(offsets.get(key, 0))
             try:
-                size = path.stat().st_size
+                info = path.stat()
             except OSError:                    # deleted since it was listed
                 continue
+            size = info.st_size
             if size < start:
                 start = 0
             if size == start:
                 continue                       # nothing new: not opened (hundreds of files)
+            def keep(role, raw, item, line_start):
+                nonlocal redactions
+                quiet = self._forget_sessions.get(session_id)
+                if quiet and quiet.get("quiet"):
+                    if role == "assistant":
+                        return             # the reply to a forget call: not remembered
+                    quiet["quiet"] = False  # the user spoke again: the exchange is over
+                cleaned, count = _redact(raw)
+                if not cleaned:
+                    return
+                redactions += count
+                block = TAGGED.match(cleaned) if role == "user" else None
+                if block:       # an app's block nobody knows yet: stored, and counted
+                    unknown[block[1]] = unknown.get(block[1], 0) + 1
+                raw_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+                ordinal_value = item.get("ordinal")
+                # where the line sits in the file: unlike the row count of this one scan,
+                # it is the same every time the file is read
+                ordinal = int(ordinal_value) if ordinal_value is not None else line_start
+                turn = {"turn_id": self._turn_id(session_id, item, ordinal, raw),
+                    "client": self.CLIENT, "client_session_id": session_id,
+                    "scope": scope, "cwd": cwd,
+                    "happened_at": item.get("timestamp") or known_at,
+                    "known_at": known_at, "role": role,
+                    "content_redacted": cleaned, "raw_sha256": raw_hash,
+                    "redaction_count": count, "source_path": key,
+                    "source_ordinal": ordinal}
+                outcome = self.store.record(turn)
+                if self.publish and outcome.get("disposition") == "RECORDED":
+                    try:
+                        self.publish(turn)
+                    except Exception:
+                        # ponytail: the hub is unreachable; the turn is kept on this PC and
+                        # brain_folder(share_existing=true) sends it to the others later
+                        pass
+                recorded.append(outcome)
+
             session_id, cwd, scope = self._session_meta(path)
+            pending, pending_at = [], None     # tool calls since the last thing said
             with path.open("rb") as handle:
                 handle.seek(start)
                 committed = start
@@ -710,47 +802,24 @@ class CodexConversationCapture:
                         self._forget_exchange(session_id, item.get("timestamp") or known_at,
                                               self._forget_sessions)
                         continue
+                    acts = self._actions(item)
                     message = self._message(item)
-                    if message is None:
-                        continue
-                    role, raw = message
-                    raw = self._prepare(role, raw)
-                    if raw is None:
-                        continue
-                    quiet = self._forget_sessions.get(session_id)
-                    if quiet and quiet.get("quiet"):
-                        if role == "assistant":
-                            continue           # the reply to a forget call: not remembered
-                        quiet["quiet"] = False  # the user spoke again: the exchange is over
-                    cleaned, count = _redact(raw)
-                    if not cleaned:
-                        continue
-                    redactions += count
-                    block = TAGGED.match(cleaned) if role == "user" else None
-                    if block:       # an app's block nobody knows yet: stored, and counted
-                        unknown[block[1]] = unknown.get(block[1], 0) + 1
-                    raw_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-                    ordinal_value = item.get("ordinal")
-                    # where the line sits in the file: unlike the row count of this one scan,
-                    # it is the same every time the file is read
-                    ordinal = int(ordinal_value) if ordinal_value is not None else line_start
-                    turn = {"turn_id": self._turn_id(session_id, item, ordinal, raw),
-                        "client": self.CLIENT, "client_session_id": session_id,
-                        "scope": scope, "cwd": cwd,
-                        "happened_at": item.get("timestamp") or known_at,
-                        "known_at": known_at, "role": role,
-                        "content_redacted": cleaned, "raw_sha256": raw_hash,
-                        "redaction_count": count, "source_path": key,
-                        "source_ordinal": ordinal}
-                    outcome = self.store.record(turn)
-                    if self.publish and outcome.get("disposition") == "RECORDED":
-                        try:
-                            self.publish(turn)
-                        except Exception:
-                            # ponytail: the hub is unreachable; the turn is kept on this PC and
-                            # brain_folder(share_existing=true) sends it to the others later
-                            pass
-                    recorded.append(outcome)
+                    raw = self._prepare(*message) if message else None
+                    if raw is not None and pending:      # what was done before this was said
+                        keep("assistant", _did(pending), *pending_at)
+                        pending = []
+                    if raw is not None:
+                        keep(message[0], raw, item, line_start)
+                    if acts:
+                        if not pending:
+                            pending_at = (item, line_start)
+                        pending += acts
+                if pending and time.time() - info.st_mtime < self.ACTIONS_SETTLE:
+                    # the agent may still be working: read these again next pass, so one
+                    # stretch of work is one line, not one per pass
+                    committed = pending_at[1]
+                elif pending:
+                    keep("assistant", _did(pending), *pending_at)
                 new_offsets[key] = committed
         if (new_offsets != offsets or self._forget_sessions != forget_before
                 or not purged):
@@ -810,6 +879,30 @@ class ClaudeCodeConversationCapture(CodexConversationCapture):
         return isinstance(content, list) and any(
             isinstance(block, dict) and block.get("type") == "tool_use"
             and str(block.get("name", "")).endswith(self.FORGET_TOOL) for block in content)
+
+    EDITS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+    SHELLS = {"Bash", "PowerShell"}
+
+    def _actions(self, item):
+        """Files the assistant edited and commands it ran (reads and searches are left out)."""
+        content = (item.get("message") or {}).get("content")
+        if item.get("type") != "assistant" or item.get("isSidechain") or not isinstance(
+                content, list):
+            return []
+        done = []
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            given = block.get("input") if isinstance(block.get("input"), dict) else {}
+            if block.get("name") in self.SHELLS and isinstance(given.get("command"), str):
+                why = given.get("description")         # the agent's own words for it
+                done.append(_ran(given["command"]) + (f"  ({why.strip()})" if isinstance(
+                    why, str) and why.strip() else ""))
+            elif block.get("name") in self.EDITS:
+                target = given.get("file_path") or given.get("notebook_path")
+                if isinstance(target, str):
+                    done.append("edited " + target)
+        return [line for line in done if line]
 
     def _message(self, item):
         if item.get("isSidechain") or item.get("isMeta"):

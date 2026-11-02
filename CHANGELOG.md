@@ -3,6 +3,18 @@
 Upgrade: `python -m pip install --upgrade turnbook`, then `turnbook-install`.
 Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 
+## Unreleased
+
+- **What the agent did is remembered.** Claude Code's and Codex's tool calls were dropped; now
+  each stretch of work between two replies is kept as one turn: `Did:` with the files edited
+  and the commands run (first line, and the agent's own description of it in Claude Code).
+  Reads, searches and tool output are still left out. Kept once the transcript has been quiet
+  for two minutes, so a long run is one line, not one per scan (on this PC: 8,499 tool calls,
+  3,247 lines, next to 6,163 replies).
+- **Claude Code plugin.** `/plugin install turnbook --marketplace goyohan0611-png/turnbook`
+  runs the memory server and the message hook through `uvx` (new command `turnbook-hook`).
+  With `turnbook-install` too, the plugin's hook stays quiet so the memory is added once.
+
 ## 1.0.0 — 2026-11-02
 Turnbook 1.0: the name everywhere, the memory in `~/.turnbook`, and the fixes of the review
 that led up to it (0.10.5). Upgrading: `pip install -U turnbook && turnbook-install`, then

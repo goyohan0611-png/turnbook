@@ -62,6 +62,12 @@ No Python needed; nothing else to set up. Restart your AI apps afterwards. Alrea
 `pip install turnbook && turnbook-install`. Rather read the script and pin a version first?
 [Careful install](docs/install.md#careful-install-read-first-pin-a-version).
 
+Only Claude Code, and [uv](https://docs.astral.sh/uv/) installed? It is also a plugin:
+
+```
+/plugin install turnbook --marketplace goyohan0611-png/turnbook
+```
+
 <details>
 <summary>Connecting an MCP client by hand</summary>
 
