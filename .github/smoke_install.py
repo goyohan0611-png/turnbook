@@ -6,8 +6,10 @@ saves a memory and finds it again. Run by .github/workflows/install-check.yml.
     python smoke_install.py recall     # only recall (after it: the memory must have survived)
 """
 import asyncio
+import os
 import shutil
 import sys
+import tempfile
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -16,7 +18,14 @@ MODE = sys.argv[1] if len(sys.argv) > 1 else "both"
 
 
 async def main():
-    server = StdioServerParameters(command=shutil.which("graph-mind"), args=[])
+    env = None
+    if not os.environ.get("CI"):
+        # run by hand on someone's own PC: never into their memory (a test fact "release day"
+        # once sat in a real memory). The same folder for remember and recall.
+        home = os.path.join(tempfile.gettempdir(), "turnbook-smoke")
+        env = {**os.environ, "TURNBOOK_HOME": home, "GRAPH_MIND_HOME": home}
+    server = StdioServerParameters(command=shutil.which("turnbook") or shutil.which("graph-mind"),
+                                   args=[], env=env)
     async with stdio_client(server) as (read, write):
         async with ClientSession(read, write) as client:
             await client.initialize()
