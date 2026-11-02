@@ -24,8 +24,9 @@ def main(argv=None):
     if list(argv if argv is not None else sys.argv[1:])[-1:] == ["run"]:
         # the service starts at login, before any app holds a file: the moment a memory from
         # before 0.11 can move to ~/.turnbook (before the paths below are worked out)
-        from turnbook.paths import move_old_home
+        from turnbook.paths import link_old_home, move_old_home
         move_old_home()
+        link_old_home()
     parser = argparse.ArgumentParser(description="Turnbook automatic capture v0.2")
     parser.add_argument("--config", default=str(default_config_path()))
     parser.add_argument("--state-dir", default=str(default_service_state_dir()))

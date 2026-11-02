@@ -26,7 +26,38 @@ def move_old_home() -> bool:
     except OSError:
         return False
     _repoint(old, new)
+    link_old_home()
     return True
+
+
+def link_old_home() -> None:
+    """~/.graph-mind as a link to ~/.turnbook: an app's memory server started before the upgrade
+    runs old code until the app restarts, and wrote to a new, empty ~/.graph-mind (a second
+    memory). A directory junction on Windows needs no administrator rights. A real folder left
+    there by such a server holding only its bookkeeping (start.lock, service.pid) is replaced."""
+    new, old = Path.home() / ".turnbook", Path.home() / ".graph-mind"
+    if not new.is_dir() or os.environ.get("TURNBOOK_HOME"):
+        return
+    if old.is_dir() and not old.is_symlink() and not _is_junction(old):
+        stray = [p for p in old.rglob("*") if p.is_file()]
+        if any(p.name not in ("start.lock", "service.pid", "service.lock") for p in stray):
+            return                      # something real in it: never thrown away
+        import shutil
+        shutil.rmtree(old, ignore_errors=True)
+    if old.exists() or old.is_symlink():
+        return
+    try:
+        if os.name == "nt":
+            import _winapi
+            _winapi.CreateJunction(str(new), str(old))
+        else:
+            old.symlink_to(new, target_is_directory=True)
+    except OSError:
+        pass
+
+
+def _is_junction(path: Path) -> bool:
+    return bool(getattr(os.path, "isjunction", lambda _: False)(path))
 
 
 def _repoint(old: Path, new: Path) -> None:

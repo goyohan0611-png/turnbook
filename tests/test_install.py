@@ -258,7 +258,8 @@ class InstallTests(unittest.TestCase):
                            (str(old / "coding" / "abc" / "d.patch"), "elsewhere"))
                 db.commit()
             self.assertTrue(paths.move_old_home())
-            self.assertFalse(old.exists())
+            self.assertTrue(old.is_symlink() or paths._is_junction(old)
+                            or old.resolve() == new.resolve(), "the old name leads to the new")
             self.assertEqual(paths.turnbook_home(), new)
             settings = json.loads((new / "automatic-capture.json").read_text(encoding="utf-8"))
             self.assertEqual(settings["db_path"], str(new / "development.sqlite"))
@@ -272,6 +273,28 @@ class InstallTests(unittest.TestCase):
                                             ).fetchone(),
                                  (str(new / "coding" / "abc" / "d.patch"), "elsewhere"))
             self.assertFalse(paths.move_old_home(), "once")
+            # a server still on old code writes through the old name into the new folder
+            (old / "automatic-capture").mkdir(exist_ok=True)
+            (old / "automatic-capture" / "service.pid").write_text("1", encoding="utf-8")
+            self.assertTrue((new / "automatic-capture" / "service.pid").exists())
+            self.assertEqual(paths.turnbook_home(), new)
+
+    def test_a_leftover_old_folder_is_linked_only_when_it_holds_nothing(self):
+        from turnbook import paths
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.dict(os.environ, {"USERPROFILE": directory, "HOME": directory}):
+            os.environ.pop("TURNBOOK_HOME", None)
+            old, new = Path(directory) / ".graph-mind", Path(directory) / ".turnbook"
+            new.mkdir()
+            (old / "automatic-capture").mkdir(parents=True)
+            (old / "automatic-capture" / "service.pid").write_text("1", encoding="utf-8")
+            (old / "notes.sqlite").write_text("real", encoding="utf-8")
+            paths.link_old_home()
+            self.assertTrue((old / "notes.sqlite").exists(), "never thrown away")
+            (old / "notes.sqlite").unlink()
+            paths.link_old_home()                          # only bookkeeping left: replaced
+            (new / "marker").write_text("x", encoding="utf-8")
+            self.assertTrue((old / "marker").exists())
 
     def test_files_that_are_ours_by_name_go_with_uninstall(self):
         """Left behind empty: Copilot CLI's hooks/turnbook.json and OpenCode's turnbook.md."""

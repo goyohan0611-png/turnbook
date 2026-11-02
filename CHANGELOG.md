@@ -13,7 +13,9 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 - **The memory folder is `~/.turnbook`.** An existing `~/.graph-mind` is moved, with the paths
   written inside it, when nothing holds a file in it: by `turnbook-install` (it stops the
   capture service and this PC's hub first) or at the next login, when the capture service
-  starts before the apps. Until then it is used where it is.
+  starts before the apps. Until then it is used where it is. Once moved, `~/.graph-mind` is a
+  link to `~/.turnbook`, so an app's memory server still on old code until the app restarts
+  writes into the same memory instead of starting an empty one.
 - **Development notes from before 0.8 are no longer answered as memories.** The feature that
   wrote them went in 0.8, but search still read its table, so an agent's task summaries from
   then took the curated-memory slots of hook packets. The notes stay in the file, unread.

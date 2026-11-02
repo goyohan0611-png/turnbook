@@ -636,10 +636,11 @@ def _move_memory() -> None:
     """A memory from before 0.11 in ~/.graph-mind: moved to ~/.turnbook with the capture service
     and this PC's hub stopped. An app still holding a file keeps it where it is, and it moves
     at the next login, when the capture service starts before the apps."""
-    from turnbook.paths import move_old_home
+    from turnbook.paths import link_old_home, move_old_home
     old = Path.home() / ".graph-mind"
     if (os.environ.get("TURNBOOK_HOME") or not old.is_dir()
             or (Path.home() / ".turnbook").exists()):
+        link_old_home()                 # moved before: the old name points to the new folder
         return
     _stop_service()
     if (old / "postgres" / "postmaster.pid").exists():
