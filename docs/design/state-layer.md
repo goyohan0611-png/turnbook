@@ -1,10 +1,21 @@
-# A state layer: the brain's workers consolidate while it sleeps
+# The brain's current understanding: one state for every agent
 
-Status: design and experiment plan (2026-11-02). Nothing implemented. Decided by the user after
-the "one brain, interchangeable workers" direction; to be kept only if the experiment below
-passes its gate.
+Status: design and experiment plan (2026-11-02). Nothing implemented. Kept only if the
+experiment below passes its gate.
 
-## Why
+Turnbook is one brain that makes several agents work as one: Claude Code, Codex and the others
+attached to it share the same memory, the same current understanding and the same work in
+progress, so whichever one the user talks to behaves like the same AI. The memory (every turn,
+verbatim) and the work (`brain_work`) exist. What is missing is the middle: an understanding
+the brain already holds, so that every agent sees the same current value, the same decision and
+the same state of a project, instead of each one piecing it together from raw turns on its own
+(and two agents ending up with two different answers).
+
+This document adds that layer. Who writes it does not matter: any worker attached to the brain
+can, whenever there is something new to fold in. Better answers to "what is it now / when /
+everything about X" are the measurable side effect, and the experiment measures them.
+
+## Why it is needed
 
 Turnbook stores every turn verbatim and finds it again: no model tokens to save, nothing lost or
 made up on the way in. What it does not have is anything *already worked out*: "what is the
@@ -53,13 +64,13 @@ drops the state lines that cite it.
 `value` lines answer knowledge updates, `event` lines with dates answer temporal questions,
 `item` lines collect what a multi-session question counts or compares.
 
-### Consolidation ("sleep")
+### Updating the understanding
 
 Incremental, in date order: for each session not yet consolidated, the worker gets the
 current state lines that share its subjects (not the whole state) and the session's turns, and
 returns state-line edits (add / replace value / add event or item), each with sources. It never
-sees a user question. This is what an idle-time job on the user's PC would do after each
-session; in production it is a `brain_work` task the worker runner (opt-in, daily cap) starts.
+sees a user question. In production any attached worker can do it, as a `brain_work` task: in its own
+session, or started by the worker runner (opt-in, daily cap).
 
 ### Reading
 
