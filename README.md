@@ -230,12 +230,12 @@ person's memory attached, gpt-5-mini solved 191, against 193 without it (p = 0.6
 
 More past conversations means more that looks like the one you mean. On LoCoMo (1,536 questions),
 with each person's memory grown tenfold by storing other people's conversations beside it, the
-answer turn stays among the first 30 found for 92.7% of questions (92.6% before it grew); plain
-rank fusion drops from 90.2% to 88.4%. A search takes 30 ms at 5,882 turns and 116 ms at 55,882.
+answer turn stays among the first 30 found for 92.7% of questions (92.6% before it grew);
+Turnbook with its re-ranker turned off drops from 90.2% to 88.4%. A search takes 30 ms at 5,882 turns and 116 ms at 55,882.
 Larger memories are being measured.
 [scale](research/runs/graph-v9.20-learning/scale_10y-embeddinggemma-300m-ONNX.json)
 
-<p align="center"><img src="https://raw.githubusercontent.com/goyohan0611-png/turnbook/main/demo/scale.png" alt="Answer turn among the first 30 found: 92.6 percent at 5,882 turns, 92.7 percent at 55,882; plain rank fusion 90.2 to 88.4 percent" width="720"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/goyohan0611-png/turnbook/main/demo/scale.png" alt="Answer turn among the first 30 found: 92.6 percent at 5,882 turns, 92.7 percent at 55,882; among the first 10: 81.4 to 81.9 percent" width="720"></p>
 
 ### In Korean
 

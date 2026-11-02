@@ -1,6 +1,6 @@
 """demo/scale.png from research/runs/graph-v9.20-learning/scale_10y-embeddinggemma-300m-ONNX.json:
-the share of LoCoMo questions whose answer turn is among the first 10 and 30 found, as the
-memory grows, for the shipped search and for plain rank fusion."""
+the share of LoCoMo questions whose answer turn is among the first 10 and 30 found as the
+memory grows (the shipped search)."""
 from pathlib import Path
 import json
 
@@ -15,17 +15,14 @@ data = json.loads((ROOT / "research/runs/graph-v9.20-learning"
 sizes = sorted({int(k.split("/")[0]) for k in data if "/" in k})
 labels = [f"{s:,} turns" for s in sizes]
 fig, ax = plt.subplots(figsize=(8, 4.2), dpi=150)
-styles = [("shipped", "hit@30", "Turnbook, first 30", "#2563eb", "-"),
-          ("shipped", "hit@10", "Turnbook, first 10", "#2563eb", "--"),
-          ("fusion (0.9.45)", "hit@30", "plain rank fusion, first 30", "#9ca3af", "-"),
-          ("fusion (0.9.45)", "hit@10", "plain rank fusion, first 10", "#9ca3af", "--")]
+styles = [("shipped", "hit@30", "answer among the first 30 found", "#2563eb", "-"),
+          ("shipped", "hit@10", "answer among the first 10 found", "#60a5fa", "--")]
 for arm, metric, name, color, line in styles:
     values = [data[f"{s}/{arm}"][metric] * 100 for s in sizes]
-    ax.plot(labels, values, line, color=color, marker="o", linewidth=2, label=name)
+    ax.plot(labels, values, line, color=color, marker="o", linewidth=2.5, label=name)
     for x, y in zip(labels, values):
-        ax.annotate(f"{y:.1f}%", (x, y), textcoords="offset points",
-                    xytext=(0, 7 if arm == "shipped" else -14),
-                    ha="center", fontsize=8, color=color)
+        ax.annotate(f"{y:.1f}%", (x, y), textcoords="offset points", xytext=(0, 8),
+                    ha="center", fontsize=9, color=color)
 ax.set_ylim(60, 100)
 ax.set_ylabel("answer turn found (%)")
 ax.set_title("As the memory grows tenfold, Turnbook still finds the answer", fontsize=11)

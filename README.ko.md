@@ -218,12 +218,12 @@ Turnbook은 원문을 그대로 두고, 저장에 모델 토큰을 쓰지 않으
 ### 기억이 쌓일수록
 
 과거 대화가 많아지면 찾는 대화와 비슷한 것도 많아집니다. LoCoMo(1,536문항)에서 사람마다 기억을 다른 사람들의
-대화로 10배 늘려도, 답이 든 대화가 찾은 것 중 상위 30개 안에 든 질문은 92.7%입니다(늘기 전 92.6%). 단순
-순위 결합은 90.2%에서 88.4%로 떨어집니다. 검색 한 번은 5,882턴에서 30ms, 55,882턴에서 116ms입니다.
+대화로 10배 늘려도, 답이 든 대화가 찾은 것 중 상위 30개 안에 든 질문은 92.7%입니다(늘기 전 92.6%).
+재정렬을 끈 Turnbook은 90.2%에서 88.4%로 떨어집니다. 검색 한 번은 5,882턴에서 30ms, 55,882턴에서 116ms입니다.
 더 큰 기억은 재는 중입니다.
 [scale](research/runs/graph-v9.20-learning/scale_10y-embeddinggemma-300m-ONNX.json)
 
-<p align="center"><img src="https://raw.githubusercontent.com/goyohan0611-png/turnbook/main/demo/scale.png" alt="상위 30개 안에 답이 든 비율: 5,882턴 92.6%, 55,882턴 92.7%, 단순 순위 결합 90.2%에서 88.4%" width="720"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/goyohan0611-png/turnbook/main/demo/scale.png" alt="상위 30개 안에 답이 든 비율: 5,882턴 92.6%, 55,882턴 92.7%. 상위 10개: 81.4%에서 81.9%" width="720"></p>
 
 ### 한국어에서는
 
