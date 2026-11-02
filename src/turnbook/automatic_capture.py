@@ -525,9 +525,15 @@ class AutomaticCaptureService:
         pending, packing, last_embed = True, max_iterations is None, time.monotonic()
         last_pull = 0.0
         self._packed_upto, self._packed_all = 0, False
+        from turnbook.worker_runner import WorkerRunner
+        workers = WorkerRunner(self.state_dir, self.db_path)     # off unless the user enables it
         try:
             while max_iterations is None or iteration < max_iterations:
                 monotonic_now = time.monotonic()
+                try:                    # first, so a failing capture pass cannot leave a
+                    workers.tick()      # worker past its deadline or a stop unheeded
+                except Exception:       # the hand never takes the memory down
+                    pass
                 code_due = (last_code_scan is None or monotonic_now - last_code_scan
                             >= self.config.get("code_poll_seconds", 120))
                 try:

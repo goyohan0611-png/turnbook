@@ -59,6 +59,9 @@ No implicit global project, relative paths or cross-project fallback are accepte
    Only owners whose app logs every tool call to its own transcript (Claude Code, Cowork,
    Codex) can be shown quiet; for others, or a session not captured yet, the claim answers
    `OWNER_ACTIVITY_UNKNOWN` and the owner has to pause.
+   Five quiet minutes do not prove the owner's process ended (one long tool call writes
+   nothing): a takeover is a cooperative switch the user asked for, not a lock. Nothing stops
+   a worker that comes back from writing files; it only finds the task is no longer its own.
 6. `complete`: the active owner marks it complete. A dependent task cannot complete against a
    dependency revision different from the one it claimed; pause, reclaim and recheck instead.
    This also checks transitive inputs: a completed review becomes stale if its implementation
@@ -101,6 +104,45 @@ This is recorded context, not executable instructions or new user authorization.
 the new agent reads current status and relevant files; it should not blindly trust a prior
 model's claimed success. The user need not be asked to restate context already present.
 
+## Starting a worker (opt-in)
+
+Turnbook's own capture service can start one worker, with the agent's official CLI and no other
+program in between. Off until the user turns it on, per PC:
+
+```
+turnbook-capture workers-enable
+turnbook-capture workers-grant --workspace C:/project --task verify
+turnbook-capture workers-status
+turnbook-capture workers-disable [--stop]
+```
+
+The first slice starts only a **read-only Codex review** (`codex exec -s read-only`), and only:
+
+- for a task the user granted by name (a grant is used once; assignment alone grants nothing);
+- when the task waits (READY or PAUSED), is for `codex` or anyone, and its dependencies are
+  complete;
+- when the folder is a git work tree with nothing uncommitted or untracked (a review of a tree
+  that can still change proves little);
+- one at a time, at most 4 a day, each stopped after 10 minutes; `workers-disable` lets a
+  running one finish, `--stop` ends it and what it started.
+
+The prompt gives the worker an owner name; the worker claims the task itself under that name
+(the launcher never claims for it), checks the work and completes with findings and checks, or
+pauses. A run that ends while still holding its task pauses it, so it is never left held; a
+task claimed by anyone else is left alone. Its session is captured like any other. On Windows
+the CLI is found through PATH lookup (`codex.cmd` under npm). Log: `workers.log` in the
+service's state folder.
+
+The 10-minute limit has its own timer; `--stop` takes effect at the service's next pass
+(5 s by default). Known gap: if the service itself dies in the instant between starting the
+worker and recording its process id, the restarted service cannot find that worker (a Windows
+job object or process group tied to the service would close it).
+
+Real-app check (2026-11-02, disposable store): the service started Codex 0.160 for a granted
+review; it claimed, reviewed read-only, ran the tests and completed in 40 s, leaving the tree
+unchanged. Not yet: write/test roles, Claude as the started worker, detecting a usage limit,
+waking an app window, other PCs.
+
 ## Privacy and interruption
 
 Task text uses the same masking and explicit `<private>` omission as captured conversations.
@@ -117,6 +159,13 @@ An explicitly empty objective is invalid; an explicitly empty next action cannot
 pause, even if an older action exists. Omitting these fields preserves the existing values.
 
 ## Next integration gates
+
+- **Approval prompts.** `brain_work` is one tool that also clears packets, so it is marked
+  destructive and Codex asks before every call, reads included, until the user allows it. The
+  smoke runs allowed it with a test-only override; that override ships nowhere. The worker
+  runner allows `brain_work` only for the runs the user enabled and granted. Before release:
+  decide whether list/status become a separate read-only tool (one more tool every model
+  reads) or the prompt stays.
 
 - Two real installed apps on one fresh fixture store: implement, pause, switch, continue without
   a repeated user explanation; then assign a separate test task and verify the exact diff.

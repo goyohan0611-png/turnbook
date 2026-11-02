@@ -5,6 +5,19 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 
 ## Unreleased
 
+- **One brain, interchangeable workers.** A worker that stopped (a usage limit, a closed app)
+  can be continued in another app when the user asks: `brain_work` claim with `takeover` set to
+  the user's words, once the owner has been quiet 5 minutes by its own transcript. "Continue"
+  now looks at the folder's work board first. Completing drops a stale next action. Checked with
+  the real Claude Code and Codex CLIs on a throwaway store: Claude paused half-way, Codex
+  finished from "이어서 해줘" alone, a new Claude session verified from "맡은 작업 있으면 해줘".
+- **Turnbook can start a review (off by default).** `turnbook-capture workers-enable`, then
+  `workers-grant` per task: the capture service starts a read-only Codex review of that task
+  (clean git tree, one at a time, 4 a day, 10 minutes each). No other program in between.
+- **turnbook-view** shows the brain's work in progress at the top of Sessions & work.
+- **`<private>` written as code** (`` `<private>` ``) is a mention, not a tag: an unclosed one
+  dropped the rest of a message that only talked about the feature.
+
 - **Follow-up continuity checks.** Empty edits cannot erase a task's objective or its required
   handover action. Open tasks stay ahead of completed history in the indexed work queue (the
   first prototype's rows are upgraded in place). Dependency freshness is checked through the

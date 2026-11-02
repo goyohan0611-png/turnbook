@@ -43,7 +43,22 @@ def main(argv=None):
     commands.add_parser("once")
     commands.add_parser("run")
     commands.add_parser("status")
+    # the one brain's hand, off by default (worker_runner.py)
+    commands.add_parser("workers-enable")
+    disable = commands.add_parser("workers-disable")
+    disable.add_argument("--stop", action="store_true", help="also stop a running worker")
+    commands.add_parser("workers-status")
+    grant = commands.add_parser("workers-grant")
+    grant.add_argument("--workspace", required=True)
+    grant.add_argument("--task", required=True)
     args = parser.parse_args(argv)
+    if args.command.startswith("workers-"):
+        from turnbook.mcp_server import configured_db_path
+        from turnbook.worker_runner import cli
+        db = (load_config(args.config)["db_path"] if os.path.isfile(args.config)
+              else str(configured_db_path()))
+        _emit(cli(args.command, args, args.state_dir, db))
+        return 0
     if args.command == "configure":
         config = make_config(workspace=args.workspace, project_id=args.project,
             session_id=args.session, sessions_root=args.sessions_root,
