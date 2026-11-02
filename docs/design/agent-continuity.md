@@ -133,13 +133,21 @@ task claimed by anyone else is left alone. Its session is captured like any othe
 the CLI is found through PATH lookup (`codex.cmd` under npm). Log: `workers.log` in the
 service's state folder.
 
+A run is isolated from the user's Codex settings: `codex exec --ignore-user-config` (no user
+hooks, other MCP servers or profiles; sign-in is kept), plus `windows.sandbox="elevated"` on
+Windows, where the read-only sandbox cannot run commands without it. Turnbook's own server is
+given whole. Ending a run counts only once the process is shown to be gone: the identity
+(creation time) is checked on the same process object that is killed, and a stop that cannot
+be confirmed (unknown identity, access denied) keeps the run tracked and its task claimed,
+marked `stop_unconfirmed`, and is retried at the next pass; nothing else starts meanwhile.
+
 The 10-minute limit has its own timer; `--stop` takes effect at the service's next pass
 (5 s by default). Known gap: if the service itself dies in the instant between starting the
 worker and recording its process id, the restarted service cannot find that worker (a Windows
 job object or process group tied to the service would close it).
 
-Real-app check (2026-11-02, disposable store): the service started Codex 0.160 for a granted
-review; it claimed, reviewed read-only, ran the tests and completed in 40 s, leaving the tree
+Real-app check (2026-11-02, disposable store, the exact argv above plus `--ephemeral`): the
+service started Codex 0.160 for a granted review; it claimed, reviewed read-only, ran the tests and completed in 40 s, leaving the tree
 unchanged. Not yet: write/test roles, Claude as the started worker, detecting a usage limit,
 waking an app window, other PCs.
 

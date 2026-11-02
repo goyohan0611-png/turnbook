@@ -175,8 +175,14 @@ class WorkerRunner:
         if sys.platform == "win32":
             flags["creationflags"] = (subprocess.CREATE_NO_WINDOW
                                       | subprocess.BELOW_NORMAL_PRIORITY_CLASS)
+        # an unattended run starts from Codex's defaults, not the user's config.toml: none of
+        # their hooks, other MCP servers or profiles run in it (auth is kept: it is not in
+        # config.toml). On Windows the read-only sandbox needs the elevated mode to run even a
+        # directory listing (smoke 11-02), so that one setting is given.
+        sandbox = ["-c", 'windows.sandbox="elevated"'] if sys.platform == "win32" else []
         argv = [*self._program(),
-                "exec", "-C", grant["workspace"], "-s", "read-only",
+                "exec", "--ignore-user-config", *sandbox,
+                "-C", grant["workspace"], "-s", "read-only",
                 "-c", 'approval_policy="never"',
                 *self._server(), "-"]
         # recorded first (the grant used, the day's count, a run with no pid yet): if this
@@ -232,7 +238,13 @@ class WorkerRunner:
             alive = self._is_worker(running)
         stop = policy.get("stop")    # disabling alone lets a running review finish
         if alive and (stop or time.time() > running["deadline"]):
-            self._kill(running)
+            if not self._kill(running):
+                # not shown to have ended (identity unknown, access denied, still running):
+                # it stays tracked and keeps its claim, so nothing else starts or takes the
+                # task; the next tick tries again
+                running["stop_unconfirmed"] = _now()
+                self.save(policy)
+                return
             code, alive = "stopped" if stop else "timeout", False
         if alive:
             return
@@ -261,21 +273,46 @@ class WorkerRunner:
         return created is not None and self._created(running["pid"]) == created
 
     def _kill(self, running):
-        """The worker and everything it started (a shell, its tests); never another program."""
+        """End the worker and everything it started (a shell, its tests), never another
+        program. True only once it is shown to be gone. The identity is checked on the very
+        Process object that is killed: a second lookup could be a new program that got the
+        pid in between, and psutil's own reuse check would then guard the wrong process."""
         # ponytail: a child that detached from the tree survives; a Windows job object would not
-        if not self._is_worker(running):
-            return
+        import psutil
+        created = running.get("created")
+        if created is None:
+            return False                     # cannot tell it from another program
         try:
-            import psutil
-            parent = psutil.Process(running["pid"])
-            for process in [*parent.children(recursive=True), parent]:
-                try:
-                    process.kill()
-                except psutil.Error:
-                    pass
-            psutil.wait_procs([parent], timeout=10)
-        except Exception:
-            pass
+            worker = psutil.Process(running["pid"])
+            if worker.create_time() != created:
+                return True                  # the worker is gone; the pid is someone else's
+        except psutil.NoSuchProcess:
+            return True
+        except psutil.Error:
+            return False
+        try:
+            family = worker.children(recursive=True)
+        except psutil.Error:
+            family = []
+        for process in [*family, worker]:
+            try:
+                process.kill()               # psutil refuses if this object's pid was reused
+            except psutil.NoSuchProcess:
+                pass
+            except psutil.Error:
+                return False
+        try:
+            _, left = psutil.wait_procs([worker], timeout=10)
+        except psutil.Error:
+            return False
+        if left:
+            return False
+        if self._child is not None and self._child.pid == running["pid"]:
+            try:
+                self._child.wait(timeout=5)  # reaped: no handle left open
+            except Exception:
+                pass
+        return True
 
     def _release(self, running, code):
         """A run that ended still holding its task pauses it, so the user or another worker

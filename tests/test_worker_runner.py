@@ -99,7 +99,8 @@ class WorkerRunnerTests(unittest.TestCase):
         self.runner.tick()                                   # one at a time
         self.run_until_done()
         (call,) = self.calls()
-        self.assertEqual(call["argv"][:5], ["exec", "-C", str(self.repo), "-s", "read-only"])
+        at = call["argv"].index("-C")
+        self.assertEqual(call["argv"][at:at + 4], ["-C", str(self.repo), "-s", "read-only"])
         self.assertIn(f"Your owner name: {running['owner']}", call["prompt"])
         self.assertIn("Task: verify", call["prompt"])
         self.runner.tick()                                   # the grant was used
@@ -247,6 +248,70 @@ class WorkerRunnerTests(unittest.TestCase):
         run = self.runner.load()["runs"][-1]
         self.assertEqual(run["exit"], "launch_failed")
         self.assertIsNone(self.runner.load().get("running"))
+
+    def test_an_unconfirmed_stop_keeps_the_worker_tracked_and_its_claim(self):
+        """Desktop Codex review 11-02: a stop that cannot be confirmed (identity unknown,
+        access denied) released the task of a worker that was still running."""
+        owner = "codex:auto-x"
+        with WorkState(self.db) as work:
+            work.change("claim", str(self.repo), agent=owner, expected_revision=1,
+                        task="verify")
+        child = mock.Mock(pid=424242)
+        child.poll.return_value = None                       # still running
+        self.runner._child = child
+        running = {"pid": child.pid, "created": None, "owner": owner, "task": "verify",
+                   "workspace": str(self.repo), "started": "x", "deadline": 0}
+        policy = {"enabled": True, "grants": [], "runs": [{"started": "x"}],
+                  "running": running}
+        self.runner._watch(policy, running)
+        self.assertIn("stop_unconfirmed", self.runner.load()["running"])
+        with WorkState(self.db) as work:
+            self.assertEqual(work.read(str(self.repo), "verify")["state"], "ACTIVE")
+        self.runner.tick()                                   # still blocks a new launch
+        self.assertEqual(self.calls(), [])
+        # once it is shown to be gone, it is recorded and its task released
+        with mock.patch.object(WorkerRunner, "_kill", lambda runner, running: True):
+            self.runner.tick()
+        self.assertIsNone(self.runner.load().get("running"))
+        with WorkState(self.db) as work:
+            self.assertEqual(work.read(str(self.repo), "verify")["state"], "PAUSED")
+
+    def test_kill_checks_identity_on_the_object_it_kills(self):
+        """One lookup: the object whose creation time matched is the one killed. A pid that
+        now belongs to another program (other creation time) is left alone."""
+        import psutil
+        lookups = []
+
+        def process(pid, created):
+            found = mock.Mock()
+            found.create_time.return_value = created
+            found.children.return_value = []
+            lookups.append(found)
+            return found
+        with mock.patch("psutil.Process", lambda pid: process(pid, 18.0)), \
+                mock.patch("psutil.wait_procs", return_value=([], [])):
+            self.assertTrue(self.runner._kill({"pid": 1, "created": 17.0}))
+        self.assertEqual(len(lookups), 1)
+        lookups[0].kill.assert_not_called()
+        lookups.clear()
+        with mock.patch("psutil.Process", lambda pid: process(pid, 17.0)), \
+                mock.patch("psutil.wait_procs", return_value=([], [])):
+            self.assertTrue(self.runner._kill({"pid": 1, "created": 17.0}))
+        self.assertEqual(len(lookups), 1)
+        lookups[0].kill.assert_called_once()
+
+        def refused(pid):                # a kill the system refuses is not a confirmed stop
+            found = process(pid, 17.0)
+            found.kill.side_effect = psutil.AccessDenied(pid)
+            return found
+        with mock.patch("psutil.Process", refused):
+            self.assertFalse(self.runner._kill({"pid": 1, "created": 17.0}))
+
+    def test_an_unattended_run_ignores_the_users_codex_config(self):
+        self.enable_and_grant()
+        self.runner.tick()
+        self.run_until_done()
+        self.assertEqual(self.calls()[0]["argv"][:2], ["exec", "--ignore-user-config"])
 
     def test_daily_limit(self):
         self.enable_and_grant()
