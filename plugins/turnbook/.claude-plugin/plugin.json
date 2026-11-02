@@ -1,24 +1,47 @@
 {
   "name": "turnbook",
+  "version": "1.1.0",
   "displayName": "Turnbook",
   "description": "Local memory for Claude Code: saves every conversation on your PC and adds the past turns that bear on each message. No LLM calls to save, nothing leaves the machine.",
-  "author": {"name": "Yohan Ko", "url": "https://github.com/goyohan0611-png"},
+  "author": {
+    "name": "Yohan Ko",
+    "url": "https://github.com/goyohan0611-png"
+  },
   "homepage": "https://github.com/goyohan0611-png/turnbook",
   "repository": "https://github.com/goyohan0611-png/turnbook",
   "license": "Apache-2.0",
   "icon": "./icon.png",
-  "keywords": ["memory", "mcp", "local", "long-term-memory"],
+  "keywords": [
+    "memory",
+    "mcp",
+    "local",
+    "long-term-memory"
+  ],
   "mcpServers": {
     "turnbook": {
       "command": "uvx",
-      "args": ["--from", "turnbook", "turnbook"],
-      "env": {"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+      "args": [
+        "--from",
+        "turnbook==1.1.0",
+        "turnbook"
+      ],
+      "env": {
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8"
+      }
     }
   },
   "hooks": {
-    "UserPromptSubmit": [{"hooks": [{
-      "type": "command", "timeout": 30,
-      "command": "uvx --from turnbook turnbook-hook claude-code UserPromptSubmit plugin"
-    }]}]
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "uvx --from turnbook==1.1.0 turnbook-hook claude-code UserPromptSubmit plugin"
+          }
+        ]
+      }
+    ]
   }
 }
