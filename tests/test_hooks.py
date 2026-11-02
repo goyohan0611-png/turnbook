@@ -154,7 +154,7 @@ class HookTests(unittest.TestCase):
                 install.other_apps(home)
             def env(*parts):
                 return json.loads(home.joinpath(*parts).read_text(encoding="utf-8"))[
-                    "mcpServers"]["graph-mind-memory"]["env"]
+                    "mcpServers"]["turnbook"]["env"]
             self.assertEqual(env(".gemini", "settings.json").get("TURNBOOK_CAPTURED"), "1")
             self.assertEqual(env(".copilot", "mcp-config.json").get("TURNBOOK_CAPTURED"), "1")
             self.assertNotIn("TURNBOOK_CAPTURED", env(".lmstudio", "mcp.json"))

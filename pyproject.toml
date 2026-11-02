@@ -57,7 +57,7 @@ graph-mind-hub = "turnbook.project_brains:hub_main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
-packages = ["turnbook"]
+packages = ["turnbook", "graph_mind"]     # graph_mind: the name before 0.11, an alias
 # where apps registered before 0.8 start the server and the capture service (gone in 0.9)
 py-modules = ["graph_mind_mcp_server", "automatic_capture_cli"]
 

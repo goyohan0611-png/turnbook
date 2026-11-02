@@ -1,11 +1,13 @@
 """install.py on a fresh, fake home: every app found gets the memory server, a second run (or a
 run after moving the folder) leaves exactly one entry, and the user's other settings survive."""
 import _isolate  # noqa: F401  (first: never touch the real ~/.turnbook)
+from contextlib import closing
 from pathlib import Path
 from unittest import mock
 import base64
 import json
 import os
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -48,7 +50,8 @@ class InstallTests(unittest.TestCase):
                     install.main(["--skip-packages", "--skip-model", "--no-start", "--yes",
                                   "--join", code])
             toml = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
-            self.assertEqual(toml.count("[mcp_servers.graph-mind-memory]"), 1)
+            self.assertEqual(toml.count("[mcp_servers.turnbook]"), 1)
+            self.assertNotIn("graph-mind-memory", toml, "the name before 0.11 is replaced")
             self.assertIn('args = ["-m", "turnbook.mcp_server"]', toml)
             self.assertIn("[mcp_servers.other]", toml)
             self.assertNotIn("'old'", toml)
@@ -56,19 +59,20 @@ class InstallTests(unittest.TestCase):
             self.assertIn("TURNBOOK_CAPTURED", toml)
             code_cli = json.loads((home / ".claude.json").read_text(encoding="utf-8"))
             self.assertEqual(code_cli["keep"], 1)
-            self.assertEqual(code_cli["mcpServers"]["graph-mind-memory"]["command"], sys.executable)
+            self.assertEqual(code_cli["mcpServers"]["turnbook"]["command"], sys.executable)
             app = json.loads((desktop / "claude_desktop_config.json").read_text(encoding="utf-8"))
-            entry = app["mcpServers"]["graph-mind-memory"]
+            self.assertNotIn("graph-mind-memory", app["mcpServers"])
+            entry = app["mcpServers"]["turnbook"]
             self.assertEqual(entry["args"], install.SERVER)
             self.assertEqual(entry["env"]["MINE"], "1")
             self.assertNotIn("type", entry)
             self.assertNotIn("TURNBOOK_CAPTURED", entry["env"])     # desktop chat: not captured
-            self.assertEqual(code_cli["mcpServers"]["graph-mind-memory"]["env"]
+            self.assertEqual(code_cli["mcpServers"]["turnbook"]["env"]
                              ["TURNBOOK_CAPTURED"], "1")
             login_item = {
                 "win32": home / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu"
-                         / "Programs" / "Startup" / "Graph-MIND Automatic Capture.lnk",
-                "darwin": home / "Library" / "LaunchAgents" / "com.graph-mind.capture.plist",
+                         / "Programs" / "Startup" / "Turnbook.lnk",
+                "darwin": home / "Library" / "LaunchAgents" / "com.turnbook.capture.plist",
             }.get(sys.platform, home / ".config" / "autostart" / "turnbook-capture.desktop")
             self.assertTrue(login_item.exists(), login_item)
             capture = json.loads((home / ".graph-mind" / "automatic-capture.json")
@@ -83,15 +87,15 @@ class InstallTests(unittest.TestCase):
                     mock.patch("turnbook.install.shutil.which", return_value=None):
                 install.uninstall([])
                 toml = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
-                self.assertNotIn("graph-mind-memory", toml)
+                self.assertNotIn("[mcp_servers.turnbook", toml)
                 self.assertIn("[mcp_servers.other]", toml)
                 self.assertIn("model = 'x'", toml)
                 code_cli = json.loads((home / ".claude.json").read_text(encoding="utf-8"))
-                self.assertNotIn("graph-mind-memory", code_cli["mcpServers"])
+                self.assertNotIn("turnbook", code_cli["mcpServers"])
                 self.assertEqual(code_cli["keep"], 1)
                 app = json.loads((desktop / "claude_desktop_config.json")
                                  .read_text(encoding="utf-8"))
-                self.assertNotIn("graph-mind-memory", app["mcpServers"])
+                self.assertNotIn("turnbook", app["mcpServers"])
                 self.assertFalse(login_item.exists())
                 self.assertTrue((home / ".graph-mind").exists(), "memory kept by default")
                 install.uninstall(["--purge", "--yes"])
@@ -139,15 +143,15 @@ class InstallTests(unittest.TestCase):
                     return json.loads(path.read_text(encoding="utf-8"))
                 self.assertIn("other", read(home / ".cursor" / "mcp.json")["mcpServers"])
                 cursor = read(home / ".cursor" / "mcp.json")["mcpServers"]
-                self.assertIn("graph-mind-memory", cursor)
+                self.assertIn("turnbook", cursor)
                 self.assertEqual(read(home / ".gemini" / "settings.json")["theme"], "Dracula")
                 vs = read(vscode / "mcp.json")["servers"]
-                self.assertEqual(vs["graph-mind-memory"]["type"], "stdio")
+                self.assertEqual(vs["turnbook"]["type"], "stdio")
                 self.assertIn("other", vs)
                 install.uninstall([])
                 cursor = read(home / ".cursor" / "mcp.json")["mcpServers"]
-                self.assertNotIn("graph-mind-memory", cursor)
-                self.assertNotIn("graph-mind-memory", read(vscode / "mcp.json")["servers"])
+                self.assertNotIn("turnbook", cursor)
+                self.assertNotIn("turnbook", read(vscode / "mcp.json")["servers"])
                 self.assertEqual(read(home / ".gemini" / "settings.json")["theme"], "Dracula")
                 (vscode / "mcp.json").write_text('{\n  // my servers\n  "servers": {}\n}',
                                                  encoding="utf-8")
@@ -170,14 +174,14 @@ class InstallTests(unittest.TestCase):
                     mock.patch("turnbook.install.shutil.which", return_value=None):
                 self.assertEqual(install.opencode(home), "OpenCode")
                 settings = json.loads(config.read_text(encoding="utf-8"))
-                server = settings["mcp"]["graph-mind-memory"]
+                server = settings["mcp"]["turnbook"]
                 self.assertEqual(server["type"], "local")
                 self.assertEqual(server["command"][1:], ["-m", "turnbook.mcp_server"])
-                guide = str(folder / "graph-mind.md")
+                guide = str(folder / "turnbook.md")
                 self.assertEqual(settings["instructions"], ["mine.md", guide])
                 self.assertIn("brain_remember", Path(guide).read_text(encoding="utf-8"))
                 self.assertEqual(settings["model"], "opencode/big-pickle")
-                plugin = (folder / "plugins" / "graph-mind.js").read_text(encoding="utf-8")
+                plugin = (folder / "plugins" / "turnbook.js").read_text(encoding="utf-8")
                 self.assertIn(json.dumps(sys.executable), plugin)
                 self.assertNotIn("__PYTHON__", plugin)
                 self.assertNotIn("__TRANSCRIPTS__", plugin)
@@ -186,12 +190,91 @@ class InstallTests(unittest.TestCase):
                                  ["mine.md", guide])
                 install.uninstall([])
                 settings = json.loads(config.read_text(encoding="utf-8"))
-                self.assertNotIn("graph-mind-memory", settings["mcp"])
+                self.assertNotIn("turnbook", settings["mcp"])
                 self.assertEqual(settings["instructions"], ["mine.md"])
-                self.assertFalse((folder / "plugins" / "graph-mind.js").exists())
+                self.assertFalse((folder / "plugins" / "turnbook.js").exists())
+
+    def test_an_install_from_before_0_11_is_taken_over(self):
+        """graph_mind.hook in Claude Code's hooks, the Graph-MIND Startup shortcut, OpenCode's
+        graph-mind files: each replaced by the turnbook one, never left beside it."""
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            (home / ".claude").mkdir()
+            old_hook = {"hooks": [{"type": "command",
+                                   "command": "python -m graph_mind.hook claude-code x"}]}
+            (home / ".claude" / "settings.json").write_text(json.dumps(
+                {"hooks": {"UserPromptSubmit": [old_hook]}}), encoding="utf-8")
+            opencode = home / ".config" / "opencode"
+            (opencode / "plugins").mkdir(parents=True)
+            (opencode / "plugins" / "graph-mind.js").write_text("old", encoding="utf-8")
+            (opencode / "graph-mind.md").write_text("old", encoding="utf-8")
+            (opencode / "opencode.json").write_text(json.dumps(
+                {"mcp": {"graph-mind-memory": {}},
+                 "instructions": [str(opencode / "graph-mind.md")]}), encoding="utf-8")
+            environment = {"USERPROFILE": str(home), "HOME": str(home), "XDG_CONFIG_HOME": "",
+                           "APPDATA": str(home / "AppData" / "Roaming"),
+                           "TURNBOOK_HOME": str(home / ".turnbook"),
+                           "TURNBOOK_CONFIG": str(home / ".turnbook" / "config.json")}
+            with mock.patch.dict(os.environ, environment), \
+                    mock.patch("turnbook.install.shutil.which", return_value=None), \
+                    mock.patch("builtins.print"):
+                old_items = install._old_login_items()
+                for item in old_items:
+                    item.parent.mkdir(parents=True, exist_ok=True)
+                    item.write_text("old", encoding="utf-8")
+                install.main(["--skip-packages", "--skip-model", "--no-start", "--yes"])
+            hooks = json.loads((home / ".claude" / "settings.json").read_text(encoding="utf-8"))
+            commands = json.dumps(hooks)
+            self.assertEqual(commands.count("turnbook.hook"), 1)
+            self.assertNotIn("graph_mind.hook", commands)
+            self.assertEqual([item for item in old_items if item.exists()], [])
+            settings = json.loads((opencode / "opencode.json").read_text(encoding="utf-8"))
+            self.assertEqual(list(settings["mcp"]), ["turnbook"])
+            self.assertEqual(settings["instructions"], [str(opencode / "turnbook.md")])
+            self.assertFalse((opencode / "graph-mind.md").exists())
+            self.assertFalse((opencode / "plugins" / "graph-mind.js").exists())
+
+    def test_the_memory_folder_moves_with_the_paths_written_in_it(self):
+        from turnbook import paths
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.dict(os.environ, {"USERPROFILE": directory, "HOME": directory,
+                                             "TURNBOOK_HOME": ""}):
+            os.environ.pop("TURNBOOK_HOME")
+            home = Path(directory)
+            old, new = home / ".graph-mind", home / ".turnbook"
+            (old / "coding" / "abc").mkdir(parents=True)
+            self.assertEqual(paths.turnbook_home(), old, "used where it is until it moves")
+            (old / "automatic-capture.json").write_text(json.dumps(
+                {"db_path": str(old / "development.sqlite"),
+                 "code_workspaces": [{"state_dir": str(old / "coding" / "abc")}]}),
+                encoding="utf-8")
+            (old / "coding" / "abc" / "coding-manifest.json").write_text(json.dumps(
+                {"files": {"a.py": {"blob_ref": str(old / "coding" / "abc" / "x.blob")}}}),
+                encoding="utf-8")
+            with closing(sqlite3.connect(old / "development.sqlite")) as db:
+                db.execute("CREATE TABLE coding_changes(diff_ref TEXT, before_ref TEXT, "
+                           "after_ref TEXT)")
+                db.execute("INSERT INTO coding_changes VALUES(?,?,NULL)",
+                           (str(old / "coding" / "abc" / "d.patch"), "elsewhere"))
+                db.commit()
+            self.assertTrue(paths.move_old_home())
+            self.assertFalse(old.exists())
+            self.assertEqual(paths.turnbook_home(), new)
+            settings = json.loads((new / "automatic-capture.json").read_text(encoding="utf-8"))
+            self.assertEqual(settings["db_path"], str(new / "development.sqlite"))
+            self.assertEqual(settings["code_workspaces"][0]["state_dir"],
+                             str(new / "coding" / "abc"))
+            manifest = (new / "coding" / "abc" / "coding-manifest.json").read_text(
+                encoding="utf-8")
+            self.assertNotIn(".graph-mind", manifest)
+            with closing(sqlite3.connect(new / "development.sqlite")) as db:
+                self.assertEqual(db.execute("SELECT diff_ref, before_ref FROM coding_changes"
+                                            ).fetchone(),
+                                 (str(new / "coding" / "abc" / "d.patch"), "elsewhere"))
+            self.assertFalse(paths.move_old_home(), "once")
 
     def test_files_that_are_ours_by_name_go_with_uninstall(self):
-        """Left behind empty: Copilot CLI's hooks/turnbook.json and OpenCode's graph-mind.md."""
+        """Left behind empty: Copilot CLI's hooks/turnbook.json and OpenCode's turnbook.md."""
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)
             (home / ".copilot").mkdir()
@@ -201,7 +284,7 @@ class InstallTests(unittest.TestCase):
                            "TURNBOOK_HOME": str(home / ".graph-mind"),
                            "TURNBOOK_CONFIG": str(home / ".graph-mind" / "config.json")}
             ours = [home / ".copilot" / "hooks" / "turnbook.json",
-                    home / ".config" / "opencode" / "graph-mind.md"]
+                    home / ".config" / "opencode" / "turnbook.md"]
             with mock.patch.dict(os.environ, environment), \
                     mock.patch("turnbook.install.shutil.which", return_value=None), \
                     mock.patch("builtins.print"):
