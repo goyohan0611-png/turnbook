@@ -68,6 +68,8 @@ Only Claude Code, and [uv](https://docs.astral.sh/uv/) installed? It is also a p
 /plugin install turnbook --marketplace goyohan0611-png/turnbook
 ```
 
+Codex: `codex plugin marketplace add goyohan0611-png/turnbook-plugin`, then `codex plugin add turnbook@turnbook`.
+
 <details>
 <summary>Connecting an MCP client by hand</summary>
 

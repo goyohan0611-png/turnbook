@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "turnbook": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "turnbook==1.1.0",
+        "turnbook"
+      ],
+      "env": {
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "turnbook",
+  "version": "1.1.0",
+  "description": "Local memory for Codex: saves every conversation on your PC and finds the past turns that answer a request. No LLM calls to save, nothing leaves the machine.",
+  "author": {
+    "name": "Yohan Ko",
+    "url": "https://github.com/goyohan0611-png"
+  },
+  "homepage": "https://github.com/goyohan0611-png/turnbook",
+  "repository": "https://github.com/goyohan0611-png/turnbook",
+  "license": "Apache-2.0",
+  "keywords": [
+    "memory",
+    "mcp",
+    "local",
+    "long-term-memory"
+  ],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Turnbook",
+    "shortDescription": "Local memory across sessions",
+    "longDescription": "Local memory for Codex: saves every conversation on your PC and finds the past turns that answer a request. No LLM calls to save, nothing leaves the machine.",
+    "developerName": "Yohan Ko",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/goyohan0611-png/turnbook",
+    "privacyPolicyURL": "https://github.com/goyohan0611-png/turnbook/blob/main/docs/privacy.md",
+    "logo": "./icon.png",
+    "composerIcon": "./icon.png",
+    "defaultPrompt": "Where did we leave off?"
+  }
+}

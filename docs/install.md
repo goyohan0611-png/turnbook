@@ -36,6 +36,8 @@ If Claude Code is the only app and [uv](https://docs.astral.sh/uv/) is on your P
 /plugin install turnbook --marketplace goyohan0611-png/turnbook
 ```
 
+Codex: `codex plugin marketplace add goyohan0611-png/turnbook-plugin`, then `codex plugin add turnbook@turnbook`.
+
 (or `claude plugin marketplace add goyohan0611-png/turnbook` and
 `claude plugin install turnbook@turnbook` in a shell). The plugin runs the memory server and the
 message hook through `uvx`; the server starts the capture service. It does not add the login item

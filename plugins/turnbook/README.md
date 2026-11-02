@@ -1,6 +1,6 @@
-# Turnbook for Claude Code
+# Turnbook for Claude Code and Codex
 
-Local memory for Claude Code. Every conversation is saved on your PC, verbatim, with no LLM
+Local memory for Claude Code and Codex. Every conversation is saved on your PC, verbatim, with no LLM
 calls to save it. Before Claude answers, the past turns that bear on your message are added
 (a small packet, held to a similarity floor so unrelated memory stays out). What the agent did,
 the files it edited and the commands it ran, is kept too.
@@ -12,6 +12,16 @@ Needs [uv](https://docs.astral.sh/uv/) on your PATH.
 ```
 /plugin install turnbook --marketplace goyohan0611-png/turnbook
 ```
+
+Codex:
+
+```
+codex plugin marketplace add goyohan0611-png/turnbook-plugin
+codex plugin add turnbook@turnbook
+```
+
+(Codex's plugin has no hook: the model calls `brain_context` itself. `turnbook-install` adds
+the per-message hook to Codex too, and connects every other app it finds.)
 
 The plugin starts the Turnbook memory server (`uvx --from turnbook turnbook`), which starts a
 background service that reads Claude Code's transcripts in `~/.claude/projects` and stores them
