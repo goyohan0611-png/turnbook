@@ -16,6 +16,11 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
   starts before the apps. Until then it is used where it is. Once moved, `~/.graph-mind` is a
   link to `~/.turnbook`, so an app's memory server still on old code until the app restarts
   writes into the same memory instead of starting an empty one.
+- **A new kind of app block shows up in the capture status.** A user turn that still begins
+  with a `<tag>` after the known blocks are taken out is stored as before and counted per tag
+  (`unknown_blocks` in the status), so the next thing an app starts putting into its "user"
+  messages is seen the first day. Tests now use transcripts shaped like the real ones.
+- `.github/smoke_install.py` run by hand uses a temp folder, never the real memory.
 - **Development notes from before 0.8 are no longer answered as memories.** The feature that
   wrote them went in 0.8, but search still read its table, so an agent's task summaries from
   then took the curated-memory slots of hook packets. The notes stay in the file, unread.

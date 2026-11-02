@@ -130,6 +130,10 @@ def _looks_random(token):
 # Raised when what is kept out grows: each transcript folder is read once more, and what an older
 # version stored that is kept out now is erased (2: compaction summaries, heartbeats, app pages)
 CLEANUP = 2
+# A user turn that still begins with a <tag> once the known blocks are out: most likely an app
+# began putting something new in its "user" messages (the compaction summary, the heartbeat and
+# the page state all came this way). Counted per tag in the capture status, never judged.
+TAGGED = re.compile(r"\s*<([a-z][a-z0-9_-]{2,40})>")
 AUTOMATIC_BLOCKS = re.compile(
     r"<(environment_context|recommended_plugins|in-app-browser-context|heartbeat|"
     r"external_codex_apps_[a-z_]+)\b[^>]*>.*?</\1>",
@@ -669,6 +673,7 @@ class CodexConversationCapture:
         new_offsets = dict(offsets)
         forget_before = {sid: dict(state) for sid, state in self._forget_sessions.items()}
         recorded, scanned_rows, redactions = [], 0, 0
+        unknown = {}
         known_at = self.now()
         for path in self._files():
             key = str(path)
@@ -721,6 +726,9 @@ class CodexConversationCapture:
                     if not cleaned:
                         continue
                     redactions += count
+                    block = TAGGED.match(cleaned) if role == "user" else None
+                    if block:       # an app's block nobody knows yet: stored, and counted
+                        unknown[block[1]] = unknown.get(block[1], 0) + 1
                     raw_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
                     ordinal_value = item.get("ordinal")
                     # where the line sits in the file: unlike the row count of this one scan,
@@ -747,9 +755,12 @@ class CodexConversationCapture:
         if (new_offsets != offsets or self._forget_sessions != forget_before
                 or not purged):
             self._write_state(new_offsets)
-        return {"status": "TURNS_RECORDED" if recorded else "NO_NEW_TURNS",
-                "recorded_turns": len(recorded), "scanned_rows": scanned_rows,
-                "redactions": redactions, "record_results": recorded}
+        result = {"status": "TURNS_RECORDED" if recorded else "NO_NEW_TURNS",
+                  "recorded_turns": len(recorded), "scanned_rows": scanned_rows,
+                  "redactions": redactions, "record_results": recorded}
+        if unknown:
+            result["unknown_blocks"] = unknown
+        return result
 
 
 CLAUDE_CODE_BLOCKS = re.compile(
