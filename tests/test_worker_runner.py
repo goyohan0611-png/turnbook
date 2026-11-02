@@ -378,6 +378,48 @@ class WorkerRunnerTests(unittest.TestCase):
         self.run_until_done()
         self.assertEqual(self.calls()[0]["argv"][:2], ["exec", "--ignore-user-config"])
 
+    def test_a_standing_understand_grant_runs_when_there_is_something_new(self):
+        from turnbook.conversation_memory import ConversationMemoryStore
+        worker_runner.cli("workers-enable", None, self.state, self.db)
+        worker_runner.cli("workers-grant", mock.Mock(understand=True, scope="global"),
+                          self.state, self.db)
+        self.runner.tick()
+        self.assertEqual(self.runner.load()["grants"][0]["waiting"], "NOTHING_NEW")
+        self.assertEqual(self.calls(), [])
+        with ConversationMemoryStore(self.db) as store:
+            store.record({"turn_id": "u1", "client": "codex", "client_session_id": "s",
+                          "scope": "global", "role": "user", "content_redacted": "I moved",
+                          "raw_sha256": "u1", "source_path": "p", "source_ordinal": 1,
+                          "happened_at": "2026-11-01T10:00:00",
+                          "known_at": "2026-11-01T10:00:00"})
+        self.runner.tick()
+        self.run_until_done()
+        (call,) = self.calls()
+        self.assertIn("brain_understand", call["prompt"])
+        self.assertIn('mcp_servers.turnbook.tools.brain_understand.approval_mode="approve"',
+                      call["argv"])
+        self.assertEqual(call["argv"][call["argv"].index("-C") + 1], str(self.state))
+        self.assertIn("--skip-git-repo-check", call["argv"])      # the state folder: no git
+        grant = self.runner.load()["grants"][0]
+        self.assertNotIn("used_at", grant)                  # standing
+        self.assertIn("last_run", grant)
+        self.runner.tick()                                  # not again within six hours
+        self.assertEqual(len(self.calls()), 1)
+        # a long turn read only in part counts as something new
+        import sqlite3
+        db = sqlite3.connect(self.db)
+        db.execute("CREATE TABLE IF NOT EXISTS understand_progress(scope TEXT PRIMARY KEY, "
+                   "last_revision INTEGER, generation INTEGER, last_offset INTEGER)")
+        revision = db.execute("SELECT MAX(revision) FROM conversation_turns").fetchone()[0]
+        db.execute("INSERT OR REPLACE INTO understand_progress VALUES('global', ?, 1, 0)",
+                   (revision,))
+        db.commit()
+        self.assertEqual(self.runner._nothing_new("global"), "NOTHING_NEW")
+        db.execute("UPDATE understand_progress SET last_offset=6000")
+        db.commit()
+        db.close()
+        self.assertIsNone(self.runner._nothing_new("global"))
+
     def test_daily_limit(self):
         self.enable_and_grant()
         policy = self.runner.load()

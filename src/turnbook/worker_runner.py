@@ -26,6 +26,7 @@ import uuid
 EXTRA_PATH = ("/opt/homebrew/bin", "/usr/local/bin", "~/.local/bin", "~/.npm-global/bin",
               "~/AppData/Roaming/npm")
 DAILY = 4
+UNDERSTAND_EVERY = 6 * 3600          # a standing understand grant runs at most this often
 TIMEOUT = 600                        # seconds a launched worker may run
 ROLE = "read-only review"
 
@@ -84,6 +85,9 @@ class WorkerRunner:
         for grant in policy["grants"]:
             if grant.get("used_at"):
                 continue
+            if grant.get("role") == "understand" and grant.get("last_run") and \
+                    time.time() - grant["last_run"] < UNDERSTAND_EVERY:
+                continue
             if not self._program():
                 grant["waiting"] = "CODEX_NOT_FOUND"
                 break
@@ -131,9 +135,12 @@ class WorkerRunner:
                         *((("TURNBOOK_HOME", os.environ["TURNBOOK_HOME"]),)
                           if os.environ.get("TURNBOOK_HOME") else ()))) + "}",
                 "-c", "mcp_servers.turnbook.startup_timeout_sec=60",
-                "-c", 'mcp_servers.turnbook.tools.brain_work.approval_mode="approve"']
+                "-c", 'mcp_servers.turnbook.tools.brain_work.approval_mode="approve"',
+                "-c", 'mcp_servers.turnbook.tools.brain_understand.approval_mode="approve"']
 
     def _not_ready(self, grant):
+        if grant.get("role") == "understand":
+            return self._nothing_new(grant["scope"])
         from turnbook.work_state import WorkState, workspace_key
         with WorkState(self.db_path) as work:
             packet = work.read(grant["workspace"], grant["task"])
@@ -159,7 +166,38 @@ class WorkerRunner:
             return "UNCOMMITTED_CHANGES"     # a review of a tree that can still change
         return None
 
+    def _nothing_new(self, scope):
+        """Turns of the scope this PC has not folded in yet, without handing out a batch."""
+        import sqlite3
+        db = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
+        try:
+            tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master")}
+            if "conversation_turns" not in tables:
+                return "NOTHING_NEW"
+            done = None
+            if "understand_progress" in tables:
+                done = db.execute("SELECT last_revision, last_offset FROM understand_progress "
+                                  "WHERE scope=?", (scope,)).fetchone()
+            last, offset = done if done else (0, 0)
+            # a long user turn read only in part (last_offset) is unfinished: it counts too
+            newer = db.execute("SELECT 1 FROM conversation_turns WHERE scope=? AND revision>? "
+                               "AND role IN ('user','assistant') LIMIT 1",
+                               (scope, last - 1 if offset else last)).fetchone()
+            return None if newer else "NOTHING_NEW"
+        finally:
+            db.close()
+
     def _start(self, policy, grant):
+        if grant.get("role") == "understand":
+            grant = {**grant, "workspace": str(self.path.parent),
+                     "task": "understand:" + grant["scope"]}
+            prompt = (
+                "Turnbook started you to keep the brain's current understanding up to date. "
+                f"Use only the brain_understand tool, scope {grant['scope']!r}: call next, work "
+                "out the state lines its guide asks for from the turns it returns, save them "
+                "with that batch (an empty list when nothing is worth keeping), and repeat until "
+                "next answers UP_TO_DATE. Do not modify files or ask anything.")
+            return self._launch(policy, grant, prompt, f"codex:understand-{uuid.uuid4().hex[:6]}")
         owner = f"codex:auto-{uuid.uuid4().hex[:8]}"
         prompt = (
             "Turnbook started you to continue one task of the user's work board, as a "
@@ -170,6 +208,9 @@ class WorkerRunner:
             "working. Use the inputs the claim returns. Check the referenced files and run "
             "the checks that apply. Complete with your findings and the checks you ran, or "
             "pause with what is left as the next action.")
+        return self._launch(policy, grant, prompt, owner)
+
+    def _launch(self, policy, grant, prompt, owner):
         log = self.path.parent / "workers.log"
         flags = {}
         if sys.platform == "win32":
@@ -180,16 +221,25 @@ class WorkerRunner:
         # config.toml). On Windows the read-only sandbox needs the elevated mode to run even a
         # directory listing (smoke 11-02), so that one setting is given.
         sandbox = ["-c", 'windows.sandbox="elevated"'] if sys.platform == "win32" else []
+        # the understanding worker runs in the service's folder, not a git work tree
+        anywhere = ["--skip-git-repo-check"] if grant.get("role") == "understand" else []
         argv = [*self._program(),
-                "exec", "--ignore-user-config", *sandbox,
+                "exec", "--ignore-user-config", *sandbox, *anywhere,
                 "-C", grant["workspace"], "-s", "read-only",
                 "-c", 'approval_policy="never"',
                 *self._server(), "-"]
         # recorded first (the grant used, the day's count, a run with no pid yet): if this
         # cannot be saved nothing starts, so no worker ever runs unrecorded
-        grant["used_at"] = _now()
-        grant.pop("waiting", None)
+        for kept in policy["grants"]:        # the policy's own grant (understand: a copy)
+            if kept.get("role") == "understand" and grant.get("role") == "understand" \
+                    and kept.get("scope") == grant.get("scope"):
+                kept["last_run"] = time.time()          # standing: runs again later
+                kept.pop("waiting", None)
+            elif kept is grant:
+                kept["used_at"] = _now()
+                kept.pop("waiting", None)
         policy["running"] = {"pid": None, "created": None, "owner": owner,
+                             "role": grant.get("role", "review"),
                              "workspace": grant["workspace"], "task": grant["task"],
                              "started": _now(), "deadline": time.time() + TIMEOUT}
         policy["runs"].append({"started": _now(), "owner": owner, "task": grant["task"],
@@ -336,6 +386,8 @@ class WorkerRunner:
     def _release(self, running, code):
         """A run that ended still holding its task pauses it, so the user or another worker
         can continue. Only this run's own claim: anything else is left as it is."""
+        if running.get("role") == "understand":
+            return                           # no task: an unsaved batch is simply handed out again
         from turnbook.work_state import WorkState
         with WorkState(self.db_path) as work:
             packet = work.read(running["workspace"], running["task"])
@@ -370,6 +422,11 @@ def _cli(runner, command, args):
         policy["runs"][-1:] = [{**run, "ended": _now(), "exit": "released by the user"}
                                for run in policy["runs"][-1:]]
         runner._release(running, "released by the user")
+    elif command == "workers-grant" and getattr(args, "understand", False) is True:
+        scope = str(getattr(args, "scope", None) or "global").strip()
+        policy["grants"] = [g for g in policy["grants"]
+                            if not (g.get("role") == "understand" and g.get("scope") == scope)]
+        policy["grants"].append({"role": "understand", "scope": scope, "granted_at": _now()})
     elif command == "workers-grant":
         from turnbook.work_state import task_key, workspace_key
         workspace_key(args.workspace)

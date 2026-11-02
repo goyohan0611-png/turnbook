@@ -42,8 +42,11 @@ GUIDE = (
     "Work out what these turns say about the user and save it as state lines. One JSON object "
     "per line: kind value|event|item, subject, attribute (value only), value (a few words, "
     "as the user said it), status fact|plan|uncertain (a plan is not a fact; contradicting "
-    "statements are uncertain), date YYYY-MM-DD when it happened or became true (null if not "
-    "said: never the day it was mentioned), sources [refs]. To update a line in `state`, give "
+    "statements are uncertain), date YYYY-MM-DD when it happened or became true: work out "
+    "'yesterday', 'last Saturday', 'on the 15th' from the turn's date; null when it cannot be "
+    "told exactly ('a few weeks ago', not said) - never the day it was mentioned. subject "
+    "names the thing (old sneakers, the trip to Jeju), not 'user'. sources [refs]. To update "
+    "a line in `state`, give "
     "its state_key. A new value line may list replaced [[earlier value, YYYY-MM-DD]] when the "
     "turns give the history. Only what the user says about themselves, their life, work and "
     "plans; not the assistant's suggestions unless the user did them. Nothing worth keeping: "
@@ -58,9 +61,10 @@ def compact(line: dict) -> str:
     kind = line.get("kind")
     if kind == "value":
         head = attribute or subject
+    elif subject.lower() in {"user", "me", "i", "the user"}:
+        head = attribute                     # "user: bought sneakers" says nothing more
     else:
-        head = subject if not attribute or subject.lower() in {"user", "me", "i"} \
-            else f"{subject} {attribute}"
+        head = f"{subject} {attribute}" if attribute else subject
     text = f"{head}: {value}" if head else value
     notes = [line["status"]] if line.get("status") in {"plan", "uncertain"} else []
     if kind == "event" and line.get("date"):

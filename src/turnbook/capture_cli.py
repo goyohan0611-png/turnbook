@@ -51,9 +51,15 @@ def main(argv=None):
     commands.add_parser("workers-release", help="after checking a worker the service cannot "
                         "identify has ended: forget it and pause its task")
     grant = commands.add_parser("workers-grant")
-    grant.add_argument("--workspace", required=True)
-    grant.add_argument("--task", required=True)
+    grant.add_argument("--workspace")
+    grant.add_argument("--task")
+    grant.add_argument("--understand", action="store_true",
+                       help="keep the brain's understanding of --scope up to date (standing)")
+    grant.add_argument("--scope", default="global")
     args = parser.parse_args(argv)
+    if args.command == "workers-grant" and not args.understand and not (
+            args.workspace and args.task):
+        parser.error("workers-grant needs --workspace and --task, or --understand")
     if args.command.startswith("workers-"):
         from turnbook.mcp_server import configured_db_path
         from turnbook.worker_runner import cli

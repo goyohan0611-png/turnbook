@@ -1,0 +1,24 @@
+{
+ "question_id": "07741c45",
+ "question": "Where do I currently keep my old sneakers?",
+ "answer": "in a shoe rack in my closet",
+ "model": "gpt-6.1-sol",
+ "effort": "medium",
+ "exit": 0,
+ "seconds": 165,
+ "turns": 527,
+ "batches": {
+  "saved": 17
+ },
+ "progress": [
+  527,
+  17,
+  0
+ ],
+ "after": "UP_TO_DATE",
+ "state_lines": 108,
+ "line_chars_median": 85,
+ "lines_sharing_answer_words": [
+  "user: organize closet this weekend; store old sneakers in shoe rack (plan)"
+ ]
+}
