@@ -61,12 +61,14 @@ def compact(line: dict) -> str:
     attribute = str(line.get("attribute") or "").strip()
     value = " ".join(str(line.get("value") or "").split())
     kind = line.get("kind")
-    if kind == "value":
-        head = attribute or subject
-    elif subject.lower() in {"user", "me", "i", "the user"}:
+    # the subject stays: "storage: under my bed" alone tells neither a reader nor the next
+    # batch's agent what is stored, and that agent then files a change as a new line
+    if subject.lower() in {"user", "me", "i", "the user"}:
         head = attribute                     # "user: bought sneakers" says nothing more
+    elif not attribute or subject.lower() in attribute.lower():
+        head = attribute or subject
     else:
-        head = f"{subject} {attribute}" if attribute else subject
+        head = f"{subject} {attribute}"
     text = f"{head}: {value}" if head else value
     notes = [line["status"]] if line.get("status") in {"plan", "uncertain"} else []
     if kind == "event" and line.get("date"):
@@ -180,7 +182,10 @@ class Understanding:
                            **({"part": t["part"]} if t["part"] else {})}
                           for ref, t in shown],
                 "state": [{"state_key": m["attributes"].get("state_key"),
-                           "kind": m["attributes"].get("kind"), "line": m["content"]}
+                           "kind": m["attributes"].get("kind"),
+                           "subject": m["attributes"].get("subject"),
+                           "attribute": m["attributes"].get("attribute"),
+                           "line": m["content"]}
                           for m in related[:STATE_SHOWN]]}
 
     def save(self, batch, lines):
@@ -360,5 +365,10 @@ if __name__ == "__main__":           # the check this module leaves behind
                     "date": "2023-04-11"}) == "trips: Jeju, 3 nights (2023-04-11)"
     assert compact({"subject": "bikes owned", "kind": "item", "value": "road bike"}) == \
         "bikes owned: road bike"
+    assert compact({"subject": "old sneakers", "kind": "value", "attribute": "storage",
+                    "value": "under my bed"}) == "old sneakers storage: under my bed"
+    assert compact({"subject": "old sneakers", "kind": "value",
+                    "attribute": "old sneakers storage", "value": "rack"}) == \
+        "old sneakers storage: rack"
     assert len(compact({"kind": "item", "subject": "x", "value": "y" * 500})) == MAX_TEXT
     print("ok")
