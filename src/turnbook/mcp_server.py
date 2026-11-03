@@ -761,10 +761,16 @@ RULES_CHARS = 1000                       # a few short rules; not a second memor
 def user_rules(database) -> str:
     """The rules saved in the brain, one line: every attached agent starts with the same ones
     (one brain), not only the app whose own settings file holds them."""
-    from turnbook.local_brain import LocalBrainStore
-    try:
-        with LocalBrainStore(database) as store:
-            rules = store.rules()
+    import sqlite3
+
+    from turnbook.local_brain import rules as saved_rules
+    try:                                 # read-only, 1 s at most: a writer never holds startup
+        db = sqlite3.connect(Path(database).resolve().as_uri() + "?mode=ro", uri=True, timeout=1)
+        try:
+            db.row_factory = sqlite3.Row
+            rules = saved_rules(db)
+        finally:
+            db.close()
     except Exception:                    # a missing or locked store: start without them
         return ""
     text = " | ".join(" ".join(r.split()) for r in rules)
@@ -1018,9 +1024,13 @@ def build_server(db_path=None, terminal=False):
         content = _redact(content)[0]
         if not content.strip():
             return {"status": "SKIPPED", "reason": "NO_PUBLIC_CONTENT"}
-        title = _redact(title)[0] if title else content.strip().splitlines()[0][:80]
+        # a title all <private> is empty once masked: the content's first line then
+        title = ((_redact(title)[0] if title else "").strip()
+                 or content.strip().splitlines()[0][:80])
         tags, entities, source_ref, attributes, about, attribute = masked(
             [tags, entities, source_ref, attributes, about, attribute])
+        tags = [t for t in tags or [] if str(t).strip()]       # entries emptied by <private>
+        entities = [e for e in entities or [] if str(e).strip()]
         known_at = _now()
         if about and attribute:
             from turnbook.local_brain import fact_key

@@ -76,3 +76,16 @@ scan (locked files, encodings, deleted files), the service's load on this PC (1.
 | Tool calls (edits, commands) are not stored, so "which file did I change yesterday, and why" has no answer | design-to-revisit | `_said`: "text blocks only: no tool_use, tool_result, thinking" (kept only what someone said); the user chose to change it 11-02 | one `Did:` turn per stretch of work (edits + commands, not reads or output) |
 | The hook attaches unrelated memories (a price list, a recorder) to coding questions | design-to-revisit | inject: "every message is searched", always 4 items, no floor; the user asked for stricter 11-02 | floor 0.36 for the hook only, measured (research/hook_floor.py); near-repeats of the message dropped |
 | Forgetting a turn kept memories that cite it in `attributes.from_turns` (notes written after answering) | gap | erase followed semantic_ingestion_audit only; from_turns notes came later (phase 6) without a forget path | erase also takes memories citing the turns (json_each on attributes.from_turns); they leave the outbox and other PCs the same way |
+
+## 2026-11-03: 1.2.0 final review, left open
+
+- **Understanding (off by default in 1.2.0): an undated state line takes its mention date as
+  effective_at**, so a later dated correction (city: Incheon, effective June 1) can rank below
+  it (city: Seoul, mentioned June 10, date unknown). Bug, not design. Fix before the layer is
+  turned on: rank undated versions by when they were said, apart from real effective dates.
+- **Rules are global only.** A rule saved with a project scope is not loaded at startup (the
+  session's project is not known there yet). Design limit for now.
+- **Plugin-only installs do not start capture** (since 1.1.0): the plugin README says every
+  conversation is saved, but only `turnbook-install` configures and starts the capture service.
+  Bug. Next after 1.2.0.
+

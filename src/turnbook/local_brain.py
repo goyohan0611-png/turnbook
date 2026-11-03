@@ -101,6 +101,39 @@ ROWS = """SELECT m.*,
           LEFT JOIN local_brain_memory_profiles p ON p.memory_id=m.memory_id"""
 
 
+def rules(db, limit=20):
+    """The user's standing rules for every agent ('항상 한국어로 답해'), the current version
+    of each, newest first. A rule replaced by any memory (superseded, or a newer version of
+    the same fact of another type) is no longer a rule. Global ones only: a project's rule
+    would need the session's project (not yet). Any connection: startup reads it read-only."""
+    rows = db.execute(f"{ROWS} WHERE m.memory_type='RULE' AND m.scope='global' "
+                      "ORDER BY m.revision DESC").fetchall()
+    memories = [LocalBrainStore._memory(row) for row in rows]
+    facts = {f for m in memories if isinstance(f := m["attributes"].get("fact"), str) and f}
+    if facts:
+        marks = ",".join("?" for _ in facts)
+        memories += [LocalBrainStore._memory(row) for row in db.execute(
+            f"{ROWS} WHERE m.memory_type<>'RULE' AND "
+            f"json_extract(p.attributes_json,'$.fact') IN ({marks})", sorted(facts))]
+    superseded = {row[0] for row in db.execute(
+        "SELECT supersedes_memory_id FROM local_brain_memories "
+        "WHERE supersedes_memory_id IS NOT NULL")}
+    # a rule is an instruction: the one saved last is in force (not by its date), and when
+    # that one was withdrawn none is; an older version never comes back
+    groups = {}
+    for m in memories:
+        fact = m["attributes"].get("fact")
+        groups.setdefault((m["scope"], fact) if isinstance(fact, str) and fact
+                          else m["memory_id"], []).append(m)
+
+    def saved(m):                    # when the user said it, not when it reached this PC
+        return m["known_at"], m["memory_id"]
+    current = [m for m in (max(g, key=saved) for g in groups.values())
+               if m["memory_type"] == "RULE" and m["memory_id"] not in superseded]
+    current.sort(key=saved, reverse=True)
+    return [m["content"] for m in current[:limit]]
+
+
 class LocalBrainStore:
     """Append-only general memory with deterministic, scope-aware recall."""
 
@@ -329,35 +362,7 @@ class LocalBrainStore:
         return sorted(current, key=lambda m: m["revision"], reverse=True)[:limit]
 
     def rules(self, limit=20):
-        """The user's standing rules for every agent ('항상 한국어로 답해'), the current version
-        of each, newest first. A rule replaced by any memory (superseded, or a newer version of
-        the same fact of another type) is no longer a rule."""
-        rows = self.db.execute(f"{ROWS} WHERE m.memory_type='RULE' ORDER BY m.revision DESC"
-                               ).fetchall()
-        memories = [self._memory(row) for row in rows]
-        facts = {f for m in memories if isinstance(f := m["attributes"].get("fact"), str) and f}
-        if facts:
-            marks = ",".join("?" for _ in facts)
-            memories += [self._memory(row) for row in self.db.execute(
-                f"{ROWS} WHERE m.memory_type<>'RULE' AND "
-                f"json_extract(p.attributes_json,'$.fact') IN ({marks})", sorted(facts))]
-        superseded = {row[0] for row in self.db.execute(
-            "SELECT supersedes_memory_id FROM local_brain_memories "
-            "WHERE supersedes_memory_id IS NOT NULL")}
-        # a rule is an instruction: the one saved last is in force (not by its date), and when
-        # that one was withdrawn none is; an older version never comes back
-        groups = {}
-        for m in memories:
-            fact = m["attributes"].get("fact")
-            groups.setdefault((m["scope"], fact) if isinstance(fact, str) and fact
-                              else m["memory_id"], []).append(m)
-
-        def saved(m):                    # when the user said it, not when it reached this PC
-            return m["known_at"], m["memory_id"]
-        current = [m for m in (max(g, key=saved) for g in groups.values())
-                   if m["memory_type"] == "RULE" and m["memory_id"] not in superseded]
-        current.sort(key=saved, reverse=True)
-        return [m["content"] for m in current[:limit]]
+        return rules(self.db, limit)
 
     def recall(self, query, *, scopes=None, as_of, knowledge_cutoff=None, limit=8,
                since=None, recent=False, meaning=None):
