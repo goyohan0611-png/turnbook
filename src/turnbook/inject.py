@@ -55,6 +55,9 @@ def _standing_out(query, memories, embedder, database, floor):
     Without the model (still loading) they stay as found."""
     if not memories:
         return memories
+    wait = getattr(embedder, "WAIT_FOR_MODEL", None)
+    if wait is not None and not embedder.ready(0):
+        return memories
     from turnbook.mcp_server import memory_meaning
     pool = {m["memory_id"]: m for m in [*_all_memories(database), *memories]}
     scores = memory_meaning(embedder, query, [m.get("title", "") + "\n" + m.get("content", "")

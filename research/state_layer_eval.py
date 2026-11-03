@@ -167,6 +167,44 @@ def consolidate(args):
         list(pool.map(work, todo))
 
 
+def product(args):
+    """The shipped layer instead of the CONSOLIDATE prompt: a real agent keeps each history with
+    brain_understand (understand_e2e.py, question-blind), its lines become state/<id>.jsonl."""
+    folder = OUT / "state"
+    folder.mkdir(parents=True, exist_ok=True)
+    chosen = json.loads((OUT / "ids.json").read_text(encoding="utf-8"))
+    todo = [q for q in chosen["shipped_wrong"] + chosen["shipped_right"][:args.right]
+            if not (folder / f"{q}.jsonl").exists()]
+
+    def work(qid):
+        e2e = OUT / "e2e" / qid / "state.jsonl"
+        report = e2e.with_name("report.json")
+        if not report.exists() or json.loads(report.read_text(encoding="utf-8")).get(
+                "after") != "UP_TO_DATE":
+            e2e.unlink(missing_ok=True)              # not folded in to the end: run it again
+        if not e2e.exists():
+            done = subprocess.run([sys.executable, str(HERE / "understand_e2e.py"), qid,
+                                   "--model", MODEL],
+                                  capture_output=True, timeout=3600)
+            if done.returncode != 0 or not e2e.exists() or json.loads(report.read_text(
+                    encoding="utf-8")).get("after") != "UP_TO_DATE":
+                print(qid, "failed:", done.stderr.decode("utf-8", "replace")[-300:], flush=True)
+                return
+        lines = []
+        for raw in e2e.read_text(encoding="utf-8").splitlines():
+            if raw.strip():
+                line = json.loads(raw)
+                attrs = line["attributes"]
+                lines.append({"subject": attrs.get("subject"), "line": line["content"],
+                              **{k: attrs[k] for k in ("kind", "status", "date", "planned_for")
+                                 if attrs.get(k)}})
+        (folder / f"{qid}.jsonl").write_text(
+            "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines), encoding="utf-8")
+        print(qid, len(lines), "state lines", flush=True)
+    with ThreadPoolExecutor(args.jobs) as pool:
+        list(pool.map(work, todo))
+
+
 STOP = set("the a an of to in on for and or is was were did do does what which who when how many "
            "much my i me you your it this that with at by from have has had be been are as".split())
 
@@ -197,6 +235,8 @@ def answer(args):
     done = {(r["question_id"], r["arm"]) for r in load_all(path)}
     jobs = []
     for qid in ids():
+        if not (OUT / "state" / f"{qid}.jsonl").exists():
+            continue                                # only histories the layer was built for
         for arm in ("records", "state"):
             if (qid, arm) not in done:
                 jobs.append((qid, arm))
@@ -299,7 +339,9 @@ def report(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("stage", choices=["pick", "consolidate", "answer", "judge", "report"])
+    parser.add_argument("stage", choices=["pick", "consolidate", "product", "answer", "judge",
+                                          "report"])
     parser.add_argument("--jobs", type=int, default=3)
+    parser.add_argument("--right", type=int, default=90, help="product: right ones to include")
     arguments = parser.parse_args()
     globals()[arguments.stage](arguments)

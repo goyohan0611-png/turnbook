@@ -222,8 +222,11 @@ class WorkerRunner:
         # config.toml). On Windows the read-only sandbox needs the elevated mode to run even a
         # directory listing (smoke 11-02), so that one setting is given.
         sandbox = ["-c", 'windows.sandbox="elevated"'] if sys.platform == "win32" else []
-        # the understanding worker runs in the service's folder, not a git work tree
-        anywhere = ["--skip-git-repo-check"] if grant.get("role") == "understand" else []
+        # the understanding worker runs in the service's folder, not a git work tree, and
+        # leaves no session file: captured, its own reply would be new turns to understand,
+        # a next run every 6 hours with nothing said by the user
+        anywhere = (["--skip-git-repo-check", "--ephemeral"] if grant.get("role") == "understand"
+                    else [])
         argv = [*self._program(),
                 "exec", "--ignore-user-config", *sandbox, *anywhere,
                 "-C", grant["workspace"], "-s", "read-only",

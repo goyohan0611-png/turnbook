@@ -19,6 +19,30 @@ def row(ordinal, role, text, timestamp="2026-09-16T10:00:00"):
 
 
 class ConversationMemoryTests(unittest.TestCase):
+    def test_document_private_block_spanning_a_heading_is_never_stored(self):
+        from turnbook.documents import DocumentCapture
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder = root / "notes"
+            folder.mkdir()
+            (folder / "spec.md").write_text(
+                "# Public\nbefore\n<private>hiddenbefore\n# hiddenheading\n"
+                "hiddenafter\n</private>\nafter\n# Next\nvisible", encoding="utf-8")
+            published = []
+            with ConversationMemoryStore(root / "brain.sqlite") as store:
+                capture = DocumentCapture([folder], store, state_path=root / "cursor.json",
+                    now=lambda: "2026-11-03T10:00:00", publish=published.append)
+                self.assertEqual(capture.scan()["recorded_turns"], 2)
+                texts = [t["content"] for t in store.latest(limit=10)["turns"]]
+                for private in ("hiddenbefore", "hiddenheading", "hiddenafter"):
+                    self.assertNotIn(private, "\n".join(texts))
+                    self.assertNotIn(private, json.dumps(published))
+                for public in ("before", "after", "visible"):
+                    self.assertIn(public, "\n".join(texts))
+                self.assertEqual(sorted(texts),
+                                 sorted(t["content_redacted"] for t in published))
+
     def test_korean_particles_come_off_the_question_words(self):
         self.assertEqual(search_terms("Caroline은 언제 지지 모임에 갔어?"),
                          ["caroline", "언제", "지지", "모임", "갔어"])

@@ -17,6 +17,7 @@ import re
 
 from turnbook.conversation_memory import _redact
 from turnbook.paths import turnbook_home
+from turnbook.privacy import strip_private
 
 SUFFIXES = {".md", ".markdown", ".txt", ".rst"}
 SKIP_DIRS = {"node_modules", "venv", "__pycache__", "dist", "build", "target", "site-packages"}
@@ -152,7 +153,7 @@ class DocumentCapture:
             changed = True
             name = path.relative_to(root.parent).as_posix()
             ids = []
-            for ordinal, (heading, body) in enumerate(sections(text)):
+            for ordinal, (heading, body) in enumerate(sections(strip_private(text))):
                 content = f"{name} > {heading}\n\n{body}" if heading else f"{name}\n\n{body}"
                 cleaned, count = _redact(content)
                 if not cleaned:

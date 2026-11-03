@@ -9,6 +9,23 @@ from turnbook.inject import context
 
 
 class OpenCodeTests(unittest.TestCase):
+    def test_word_matches_stay_unchanged_while_the_model_is_loading(self):
+        from unittest import mock
+        import time
+        from turnbook.inject import _standing_out
+
+        memories = [{"memory_id": "dog", "title": "Kongi", "content": "golden retriever"}]
+        embedder = mock.Mock(WAIT_FOR_MODEL=2.0)
+        embedder.ready.return_value = False
+        with mock.patch("turnbook.inject._all_memories", return_value=memories):
+            began = time.monotonic()
+            found = _standing_out("Kongi", memories, embedder, "unused", 0.36)
+            elapsed = time.monotonic() - began
+        self.assertIs(found, memories)
+        embedder.ready.assert_called_once_with(0)
+        embedder.embed.assert_not_called()
+        self.assertLess(elapsed, 1.0)
+
     def test_what_the_plugin_writes_is_captured_once(self):
         """The plugin's transcript (Claude Code's record shape): both sides, stored once."""
         with tempfile.TemporaryDirectory() as directory:

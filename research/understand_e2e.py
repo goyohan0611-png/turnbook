@@ -93,7 +93,7 @@ def main():
     (out / "state.jsonl").write_text("".join(json.dumps(
         {"content": m["content"], "attributes": m["attributes"]}, ensure_ascii=False) + "\n"
         for m in state), encoding="utf-8")
-    answer_words = {w for w in row["answer"].lower().split() if len(w) > 3}
+    answer_words = {w for w in str(row["answer"]).lower().split() if len(w) > 3}
     hits = [m["content"] for m in state if answer_words & set(m["content"].lower().split())]
     report = {"question_id": args.question_id, "question": row["question"],
               "answer": row["answer"], "model": args.model, "effort": args.effort,

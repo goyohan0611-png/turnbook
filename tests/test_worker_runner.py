@@ -404,6 +404,7 @@ class WorkerRunnerTests(unittest.TestCase):
                       call["argv"])
         self.assertEqual(call["argv"][call["argv"].index("-C") + 1], str(self.state))
         self.assertIn("--skip-git-repo-check", call["argv"])      # the state folder: no git
+        self.assertIn("--ephemeral", call["argv"])        # its reply is never a turn to understand
         grant = self.runner.load()["grants"][0]
         self.assertNotIn("used_at", grant)                  # standing
         self.assertIn("last_run", grant)
