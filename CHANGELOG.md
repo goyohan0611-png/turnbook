@@ -5,13 +5,6 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 
 ## 1.2.0 — 2026-11-03
 
-- **The brain's current understanding (prototype).** `brain_understand` hands an agent the turns
-  not yet folded in and saves short state lines it works out from them ("old sneakers storage:
-  shoe rack (plan)"), each citing its turns. A changed value updates its line; plans and unknown
-  dates are marked as such. Lines are kept apart from facts you saved, masked before saving and
-  shared with your other PCs. Ask any agent ("이해 정리해 줘"), or schedule it in the app (a
-  daily Claude Code or Codex task). On a 527-turn history: 108 lines in 141 s; 0.1-0.2 s added
-  per message.
 - **Your rules, for every agent.** Tell any agent a standing rule ("항상 한국어로 답해"): it is
   saved in the brain, and Claude, Codex, Gemini and OpenCode all start their next session with
   it. A changed rule replaces the old one.

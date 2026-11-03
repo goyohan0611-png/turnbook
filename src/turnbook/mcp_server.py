@@ -846,7 +846,12 @@ def build_server(db_path=None, terminal=False):
         version=SERVER_VERSION,
     )
 
-    @server.tool(
+    # not in 1.2.0's tools: the measured gain did not yet pay for its cost (research/
+    # state_layer_eval.py); TURNBOOK_UNDERSTAND=1 turns it on for experiments
+    understand = server.tool if os.environ.get("TURNBOOK_UNDERSTAND") else (
+        lambda **_: lambda function: function)
+
+    @understand(
         name="brain_understand", structured_output=True,
         annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=False,
                                           idempotentHint=True, openWorldHint=False),

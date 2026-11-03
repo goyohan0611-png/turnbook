@@ -67,7 +67,8 @@ def main():
     start = "import sys; sys.path.insert(0, %r); from turnbook.mcp_server import main; main()" \
         % str(SRC)
     env = "{" + ",".join(f"{k}={json.dumps(v, ensure_ascii=False)}" for k, v in (
-        ("TURNBOOK_DB", str(db)), ("TURNBOOK_HOME", str(home)), ("PYTHONUTF8", "1"))) + "}"
+        ("TURNBOOK_DB", str(db)), ("TURNBOOK_HOME", str(home)), ("PYTHONUTF8", "1"),
+        ("TURNBOOK_UNDERSTAND", "1"))) + "}"
     argv = [shutil.which("codex"), "exec", "--ephemeral", "--ignore-user-config",
             "--skip-git-repo-check", "-s", "read-only", "-C", str(home), "-m", args.model,
             "-c", f'model_reasoning_effort="{args.effort}"',
