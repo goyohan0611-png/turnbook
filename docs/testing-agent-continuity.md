@@ -1,4 +1,4 @@
-# Agent continuity: validation of the unreleased 1.2.0 prototype
+# Agent continuity: validation of the 1.2.0 prototype
 
 Measured locally on Windows / Python 3.12, 2026-11-02. No real personal memory stores were opened
 or copied by the tests, and no answer-model API was called. Test homes and databases are temporary.

@@ -3,8 +3,22 @@
 Upgrade: `python -m pip install --upgrade turnbook`, then `turnbook-install`.
 Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
 
-## Unreleased
+## 1.2.0 — 2026-11-03
 
+- **The brain's current understanding (prototype).** `brain_understand` hands an agent the turns
+  not yet folded in and saves short state lines it works out from them ("old sneakers storage:
+  shoe rack (plan)"), each citing its turns. A changed value updates its line; plans and unknown
+  dates are marked as such. Lines are kept apart from facts you saved, masked before saving and
+  shared with your other PCs. `workers-grant --understand` lets the capture service have Codex
+  keep it up to date (off by default, at most every 6 hours). On a 527-turn history: 108 lines
+  in 141 s; 0.1-0.2 s added per message.
+- **Forgetting a turn also forgets what was built from it** (memories citing it in
+  `from_turns`).
+- **Reading the work board asks for no approval.** `brain_work_status` reads; `brain_work`
+  keeps the writes.
+- **Agents know which other agents are on this PC.** The instructions name the agent CLIs found
+  (`codex exec`, `claude -p`, `gemini -p`, `opencode run`, `copilot -p`), so "Codex랑 같이 해"
+  needs no explanation; the caller puts the task in the prompt and records the result.
 - **One brain, interchangeable workers.** A worker that stopped (a usage limit, a closed app)
   can be continued in another app when the user asks: `brain_work` claim with `takeover` set to
   the user's words, once the owner has been quiet 5 minutes by its own transcript. "Continue"

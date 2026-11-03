@@ -55,7 +55,7 @@ If you would rather not pipe a script into a shell:
 2. Install one exact version, so nothing changes until you choose to upgrade:
 
    ```bash
-   uv tool install --python 3.12 turnbook==1.1.0
+   uv tool install --python 3.12 turnbook==1.2.0
    turnbook-install
    ```
 
@@ -144,9 +144,9 @@ provides the tools, while `turnbook-install` adds capture and per-message memory
 | `brain_forget` | "delete the password I typed": lists masked candidates, deletes only what you pick, everywhere |
 | `code_activity` | what changed in a project, file or symbol, and when (when a code folder is watched) |
 | `brain_checkpoint` | [project brains](teams.md), for teams that use them |
-| `brain_understand` (unreleased prototype) | keeps the brain's current understanding: turns not yet folded in, and short state lines worked out from them with their sources; [design](design/state-layer.md) |
-| `brain_work_status` (unreleased prototype) | read the folder's tasks or one task's packet |
-| `brain_work` (unreleased prototype) | update tasks; [protocol](design/agent-continuity.md) |
+| `brain_understand` (prototype) | keeps the brain's current understanding: turns not yet folded in, and short state lines worked out from them with their sources; [design](design/state-layer.md) |
+| `brain_work_status` (prototype) | read the folder's tasks or one task's packet |
+| `brain_work` (prototype) | update tasks; [protocol](design/agent-continuity.md) |
 
 Few tools on purpose: every tool's description is read by the model on every turn, and similar
 tools get confused with each other.
