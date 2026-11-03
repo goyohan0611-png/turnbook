@@ -64,7 +64,10 @@ function recall(text) {
         "import sys; sys.path[:] = [p for p in sys.path if p]; " +
         "import runpy; runpy.run_module('turnbook.inject', run_name='__main__')"],
         { timeout: INJECT_TIMEOUT_MS, windowsHide: true, maxBuffer: 1 << 20,
-          env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", PYTHONSAFEPATH: "1" } },
+          // TURNBOOK_RULES: OpenCode drops a server's instructions, so the user's rules come
+          // with every message's memory (its system prompt is rebuilt each time)
+          env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", PYTHONSAFEPATH: "1",
+                 TURNBOOK_RULES: "1" } },
         (error, stdout) => resolve(error ? "" : String(stdout || "")));
       child.stdin.end(text);
     } catch {

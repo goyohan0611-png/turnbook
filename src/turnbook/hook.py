@@ -136,22 +136,26 @@ def left_off(event: dict) -> str:
     if event.get("source") not in (None, "startup", "clear") or not isinstance(cwd, str):
         return ""
     from turnbook.conversation_memory import ConversationMemoryStore
-    from turnbook.mcp_server import configured_db_path
+    from turnbook.mcp_server import configured_db_path, user_rules
     from turnbook.work_state import WorkState, context
     database = configured_db_path()
     with WorkState(database) as work:
         packets = [packet for packet in work.tasks(cwd) if packet["state"] not in
                    {"EMPTY", "COMPLETE"}]
         handover = "\n\n".join(context(packet, maximum=550) for packet in packets[:2])
+    # first, outside the handover's budget: apps that drop a server's instructions still start
+    # with the user's rules
+    rules = user_rules(database)
     with ConversationMemoryStore(database) as store:
         turns = store.previous_session(cwd, session, client=event.get("_turnbook_client"),
                                        limit=LEFT_OFF_TURNS)
     if not turns:
-        return handover
+        return (rules + "\n\n" + handover).strip()
     lines = [f"[{t['role']}] " + " ".join(str(t["content"]).split())[:300] for t in turns]
     text = "\n".join(lines)[-LEFT_OFF_CHARS:]
     previous = LEFT_OFF.format(str(turns[-1]["happened_at"])[:16].replace("T", " ")) + text
-    return (handover + "\n\n" + previous).strip()[:LEFT_OFF_CHARS + len(LEFT_OFF)]
+    body = (handover + "\n\n" + previous).strip()[:LEFT_OFF_CHARS + len(LEFT_OFF)]
+    return (rules + "\n\n" + body).strip()
 
 
 def reply(agent: str, event_name: str, text: str | None, event: dict | None = None) -> dict:

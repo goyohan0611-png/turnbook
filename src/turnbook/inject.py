@@ -39,14 +39,17 @@ def _kept(items, floor):
 # same message: the answering one 0.28 or more above their mean, the best unrelated one 0.17 at
 # most. With few memories there is no "rest": the floor then.
 STANDS_OUT, FEW = 0.2, 10
+# ponytail: a memory this close is in whatever the rest score, or a store of memories about one
+# project (all near the message) would keep none; 0.6 is above every unrelated one measured
+STRONG = 0.6
 
 
 def _all_memories(database):
     from turnbook.local_brain import LocalBrainStore
     from turnbook.mcp_server import _now
     with LocalBrainStore(database) as store:
-        # ponytail: the 50 newest stand for "the rest"; recall stops there
-        return store.recall("memory", as_of=_now(), limit=50, recent=True)["matches"]
+        # ponytail: the 50 newest stand for "the rest"
+        return store.newest(as_of=_now(), limit=50)
 
 
 def _standing_out(query, memories, embedder, database, floor):
@@ -65,7 +68,7 @@ def _standing_out(query, memories, embedder, database, floor):
     if not scores:
         return memories
     similarity = dict(zip(pool, scores))
-    bar = (sum(scores) / len(scores) + STANDS_OUT) if len(scores) >= FEW else floor
+    bar = min(sum(scores) / len(scores) + STANDS_OUT, STRONG) if len(scores) >= FEW else floor
     return [{**m, "similarity": similarity[m["memory_id"]]} for m in memories
             if similarity[m["memory_id"]] >= bar]
 
@@ -158,6 +161,12 @@ def main() -> None:
     """OpenCode's plugin: the same deadline as the other agents' hook (it waited up to 15 s)."""
     from turnbook.hook import DEADLINE, _abandoned, within
     try:
+        if os.environ.get("TURNBOOK_RULES"):  # OpenCode drops a server's instructions: the
+            from turnbook.mcp_server import configured_db_path, user_rules
+            rules = user_rules(configured_db_path())    # rules first (a local read), kept
+            if rules:                                   # even when the search below fails
+                sys.stdout.write(rules + "\n\n")
+                sys.stdout.flush()
         sys.stdout.write(within(DEADLINE, context, sys.stdin.read()[:4000]) or "")
     except Exception:                         # never in the way of the message itself
         pass

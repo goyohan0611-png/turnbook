@@ -114,5 +114,47 @@ class OtherAgentsTests(unittest.TestCase):
             self.assertEqual(mcp_server.other_agents(), "")
 
 
+class RulesTests(unittest.IsolatedAsyncioTestCase):
+    async def test_every_agent_starts_with_the_current_rules(self):
+        """A rule saved in Claude reaches Codex: one brain, not one settings file per app."""
+        from turnbook import mcp_server
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            database = Path(folder) / "brain.sqlite"
+            async with Client(build_server(database)) as claude:
+                for rule in ("영어로 답해", "항상 한국어로 답해"):
+                    await claude.call_tool("brain_remember", {
+                        "content": rule, "memory_type": "rule", "about": "me",
+                        "attribute": "reply_language"})
+                await claude.call_tool("brain_remember", {"content": "공이는 골든리트리버"})
+            text = mcp_server.instructions(True, database)
+            self.assertTrue(text.startswith(mcp_server.RULES + "항상 한국어로 답해"))
+            self.assertNotIn("영어로 답해", text)
+            self.assertNotIn("공이", text)                   # a fact is not a rule
+            self.assertNotIn(mcp_server.RULES, mcp_server.instructions(True))
+            async with Client(build_server(database)) as codex:   # withdrawn by a plain memory
+                rule = await codex.call_tool("brain_remember", {
+                    "content": "커밋 전에 테스트", "memory_type": "rule"})
+                self.assertIn("커밋 전에 테스트", mcp_server.user_rules(database))
+                await codex.call_tool("brain_remember", {
+                    "content": "테스트 규칙은 이제 없음",
+                    "supersedes_memory_id": rule.structured_content["memory_id"]})
+            self.assertNotIn("커밋 전에 테스트", mcp_server.user_rules(database))
+            self.assertIn("항상 한국어로 답해", mcp_server.user_rules(database))
+            async with Client(build_server(database)) as codex:
+                await codex.call_tool("brain_remember", {         # an odd fact: others stay
+                    "content": "짧게 답해", "memory_type": "rule", "attributes": {"fact": [1]}})
+                self.assertIn("짧게 답해", mcp_server.user_rules(database))
+                from turnbook.local_brain import LocalBrainStore
+                with LocalBrainStore(database) as store:
+                    korean = next(r["memory_id"] for r in store.recall(
+                        "한국어", as_of="2999-01-01T00:00:00", limit=50)["matches"]
+                        if r["content"] == "항상 한국어로 답해")
+                await codex.call_tool("brain_remember", {         # withdrawn: English stays out
+                    "content": "언어 규칙 없음", "supersedes_memory_id": korean})
+            rules = mcp_server.user_rules(database)
+            self.assertNotIn("한국어", rules)
+            self.assertNotIn("영어로 답해", rules)
+
+
 if __name__ == "__main__":
     unittest.main()

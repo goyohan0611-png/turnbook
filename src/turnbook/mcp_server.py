@@ -754,10 +754,29 @@ def other_agents() -> str:
             "board yourself (brain_work). A new run each time; no session to resume.")
 
 
-def instructions(captured: bool) -> str:
+RULES = "The user's rules, for every reply and every agent: "
+RULES_CHARS = 1000                       # a few short rules; not a second memory
+
+
+def user_rules(database) -> str:
+    """The rules saved in the brain, one line: every attached agent starts with the same ones
+    (one brain), not only the app whose own settings file holds them."""
+    from turnbook.local_brain import LocalBrainStore
+    try:
+        with LocalBrainStore(database) as store:
+            rules = store.rules()
+    except Exception:                    # a missing or locked store: start without them
+        return ""
+    text = " | ".join(" ".join(r.split()) for r in rules)
+    return (RULES + text[:RULES_CHARS]) if rules else ""
+
+
+def instructions(captured: bool, database=None) -> str:
     """What every model is told about the memory: also written to a file for apps that do not
     pass a server's instructions on to the model (OpenCode's instructions file)."""
-    return (CAPTURED_NOTE if captured else PROACTIVE_NOTE) + GUIDE + other_agents()
+    rules = user_rules(database) if database else ""
+    return ((rules + "\n\n" if rules else "") + (CAPTURED_NOTE if captured else PROACTIVE_NOTE)
+            + GUIDE + other_agents())
 
 
 def type_name(error) -> str:
@@ -823,7 +842,7 @@ def build_server(db_path=None, terminal=False):
         "graph-mind-memory",
         title="Turnbook Universal Personal Memory",
         description="User-owned local brain shared across models, sessions and applications.",
-        instructions=instructions(bool(os.environ.get("TURNBOOK_CAPTURED"))),
+        instructions=instructions(bool(os.environ.get("TURNBOOK_CAPTURED")), database),
         version=SERVER_VERSION,
     )
 
@@ -969,6 +988,10 @@ def build_server(db_path=None, terminal=False):
         something remembered earlier, pass that memory's id as `supersedes_memory_id`.
         Decisions and their reasons are memories too: `memory_type="decision"`, the reason in
         `content`, the project or component in `entities`.
+        A standing rule for how you (and every other agent) should work for the user ("항상
+        한국어로 답해", "커밋 전에 테스트 돌려"): `memory_type="rule"`, about "me", attribute a
+        short name ("reply_language"), so a changed rule replaces the old one. Every agent
+        starts its next session with the saved rules.
 
         Save silently. Do not tell the user you saved it ("I've noted that", "저장해 뒀어"); just
         carry on with the conversation. Talk about memory only if the user asks what you remember

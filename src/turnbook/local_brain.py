@@ -88,6 +88,19 @@ def current_facts(memories, *, keep_earlier=5):
     return plain
 
 
+ROWS = """SELECT m.*,
+            p.schema_version AS profile_schema_version,
+            p.memory_class AS profile_memory_class,
+            p.modality AS profile_modality,
+            p.retention AS profile_retention,
+            p.importance AS profile_importance,
+            p.confidence AS profile_confidence,
+            p.attributes_json AS profile_attributes_json,
+            p.related_memory_ids_json AS profile_related_memory_ids_json
+          FROM local_brain_memories m
+          LEFT JOIN local_brain_memory_profiles p ON p.memory_id=m.memory_id"""
+
+
 class LocalBrainStore:
     """Append-only general memory with deterministic, scope-aware recall."""
 
@@ -304,6 +317,48 @@ class LocalBrainStore:
                 "supersedes_memory_id": row["supersedes_memory_id"], **profile}
 
 
+    def newest(self, *, as_of, limit=50):
+        """The current memories, newest first, unfiltered: what 'the rest' is for a message.
+        recall(recent=True) narrows to memories a word names ("memory" names some)."""
+        rows = self.db.execute(f"{ROWS} WHERE m.effective_at<=? AND m.known_at<=? "
+                               "ORDER BY m.revision DESC LIMIT ?",
+                               (self._time(as_of), self._time(as_of), limit * 4)).fetchall()
+        memories = [self._memory(row) for row in rows]
+        superseded = {m["supersedes_memory_id"] for m in memories if m["supersedes_memory_id"]}
+        current = current_facts([m for m in memories if m["memory_id"] not in superseded])
+        return sorted(current, key=lambda m: m["revision"], reverse=True)[:limit]
+
+    def rules(self, limit=20):
+        """The user's standing rules for every agent ('항상 한국어로 답해'), the current version
+        of each, newest first. A rule replaced by any memory (superseded, or a newer version of
+        the same fact of another type) is no longer a rule."""
+        rows = self.db.execute(f"{ROWS} WHERE m.memory_type='RULE' ORDER BY m.revision DESC"
+                               ).fetchall()
+        memories = [self._memory(row) for row in rows]
+        facts = {f for m in memories if isinstance(f := m["attributes"].get("fact"), str) and f}
+        if facts:
+            marks = ",".join("?" for _ in facts)
+            memories += [self._memory(row) for row in self.db.execute(
+                f"{ROWS} WHERE m.memory_type<>'RULE' AND "
+                f"json_extract(p.attributes_json,'$.fact') IN ({marks})", sorted(facts))]
+        superseded = {row[0] for row in self.db.execute(
+            "SELECT supersedes_memory_id FROM local_brain_memories "
+            "WHERE supersedes_memory_id IS NOT NULL")}
+        # a rule is an instruction: the one saved last is in force (not by its date), and when
+        # that one was withdrawn none is; an older version never comes back
+        groups = {}
+        for m in memories:
+            fact = m["attributes"].get("fact")
+            groups.setdefault((m["scope"], fact) if isinstance(fact, str) and fact
+                              else m["memory_id"], []).append(m)
+
+        def saved(m):                    # when the user said it, not when it reached this PC
+            return m["known_at"], m["memory_id"]
+        current = [m for m in (max(g, key=saved) for g in groups.values())
+                   if m["memory_type"] == "RULE" and m["memory_id"] not in superseded]
+        current.sort(key=saved, reverse=True)
+        return [m["content"] for m in current[:limit]]
+
     def recall(self, query, *, scopes=None, as_of, knowledge_cutoff=None, limit=8,
                since=None, recent=False, meaning=None):
         """Memories for a query, by relevance, or newest first when `recent` is set.
@@ -330,18 +385,8 @@ class LocalBrainStore:
         if scope_list:
             where += " AND scope IN (" + ",".join("?" for _ in scope_list) + ")"
             parameters.extend(scope_list)
-        rows = self.db.execute(f"""SELECT m.*,
-            p.schema_version AS profile_schema_version,
-            p.memory_class AS profile_memory_class,
-            p.modality AS profile_modality,
-            p.retention AS profile_retention,
-            p.importance AS profile_importance,
-            p.confidence AS profile_confidence,
-            p.attributes_json AS profile_attributes_json,
-            p.related_memory_ids_json AS profile_related_memory_ids_json
-          FROM local_brain_memories m
-          LEFT JOIN local_brain_memory_profiles p ON p.memory_id=m.memory_id
-          WHERE {where} ORDER BY m.revision DESC""", parameters).fetchall()
+        rows = self.db.execute(f"{ROWS} WHERE {where} ORDER BY m.revision DESC",
+                               parameters).fetchall()
         memories = [self._memory(row) for row in rows]
         superseded = {item["supersedes_memory_id"] for item in memories
                       if item["supersedes_memory_id"]}
