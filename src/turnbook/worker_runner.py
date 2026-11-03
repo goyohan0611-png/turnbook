@@ -136,6 +136,7 @@ class WorkerRunner:
                           if os.environ.get("TURNBOOK_HOME") else ()))) + "}",
                 "-c", "mcp_servers.turnbook.startup_timeout_sec=60",
                 "-c", 'mcp_servers.turnbook.tools.brain_work.approval_mode="approve"',
+                "-c", 'mcp_servers.turnbook.tools.brain_work_status.approval_mode="approve"',
                 "-c", 'mcp_servers.turnbook.tools.brain_understand.approval_mode="approve"']
 
     def _not_ready(self, grant):
@@ -203,7 +204,7 @@ class WorkerRunner:
             "Turnbook started you to continue one task of the user's work board, as a "
             f"{ROLE}: do not modify files.\n"
             f"Workspace: {grant['workspace']}\nTask: {grant['task']}\nYour owner name: {owner}\n"
-            "First call brain_work status for this workspace and task, then claim it with "
+            "First call brain_work_status for this workspace and task, then brain_work claim with "
             "that owner name and the revision you read. If the claim fails, stop without "
             "working. Use the inputs the claim returns. Check the referenced files and run "
             "the checks that apply. Complete with your findings and the checks you ran, or "

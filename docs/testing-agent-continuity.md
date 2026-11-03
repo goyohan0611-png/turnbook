@@ -73,12 +73,16 @@ memory, hooks or capture service were involved.
 Found and fixed on the way:
 - The first Codex run searched conversation memory (`brain_recall`) for "continue" and missed
   the board: with no SessionStart hook nothing pointed it there. The server guide now says to
-  list the folder's work first when asked to continue.
+  call `brain_work_status` with the folder first when asked to continue; pass a task id to read
+  one packet.
 - Completing left "next: run unittest" and "unittest not run yet" from before the run: complete
   now drops the next action and marks unrestated checks as recorded before completion.
-- Codex asks before every `brain_work` call (the tool can clear a packet, so it is marked
+- Codex asked before every `brain_work` call (the tool can clear a packet, so it is marked
   destructive); the run needed `mcp_servers.<name>.tools.brain_work.approval_mode="approve"`.
-  In daily use people will see that prompt until they allow it once. Not changed yet.
+  Reads now use the separate read-only `brain_work_status(workspace, task=None)` tool: omit
+  task for the list, or pass it for a packet. `brain_work` accepts only writes. Automated tests
+  check the read annotations, return shapes and rejection of the old read actions; the split
+  has not yet been rechecked in real apps.
 
 Not covered here: SessionStart injection inside the real apps (hooks were off), the takeover
 of a worker that stopped without pausing (needs a captured transcript; unit-tested), and two

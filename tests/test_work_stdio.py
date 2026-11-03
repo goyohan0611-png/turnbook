@@ -73,7 +73,10 @@ class WorkStdioTests(unittest.IsolatedAsyncioTestCase):
 
             # A third, newly started server sees the same state and cannot silently steal it.
             async with Client(parameters, read_timeout_seconds=30) as fresh:
-                known = await call(fresh, "status", task="continue")
+                response = await fresh.call_tool("brain_work_status", {
+                    "workspace": str(root), "task": "continue"})
+                self.assertFalse(response.is_error, str(response))
+                known = response.structured_content
                 self.assertEqual(known["work"]["owner"], "claude-code:two")
                 blocked = await call(fresh, "claim", task="continue", agent="opencode:three",
                                      expected_revision=known["revision"])

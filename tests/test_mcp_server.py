@@ -56,11 +56,17 @@ class GraphMindMcpServerTests(unittest.IsolatedAsyncioTestCase):
                 names = set(by_name)
                 self.assertEqual(names, {"brain_remember", "brain_recall", "brain_context",
                                          "brain_folder", "brain_forget", "code_activity",
-                                         "brain_checkpoint", "brain_work",
+                                         "brain_checkpoint", "brain_work", "brain_work_status",
                                          "brain_understand"})
                 self.assertFalse(by_name["brain_remember"].annotations.read_only_hint)
-                for name in ("brain_recall", "brain_context", "code_activity"):
+                for name in ("brain_recall", "brain_context", "code_activity", "brain_work_status"):
                     self.assertTrue(by_name[name].annotations.read_only_hint)
+                annotations = by_name["brain_work_status"].annotations
+                self.assertFalse(annotations.destructive_hint)
+                self.assertTrue(annotations.idempotent_hint)
+                self.assertFalse(annotations.open_world_hint)
+                self.assertTrue(by_name["brain_work"].annotations.destructive_hint)
+                self.assertFalse(by_name["brain_work"].annotations.read_only_hint)
                 recalled = await client.call_tool("brain_recall", {
                     "query": "마인드 프로젝트가 뭐야?"})
                 self.assertFalse(recalled.is_error)

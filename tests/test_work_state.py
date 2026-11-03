@@ -291,17 +291,27 @@ class WorkToolTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as folder:
             database = Path(folder) / "brain.sqlite"
             async with Client(build_server(database)) as claude:
-                empty = await claude.call_tool("brain_work",
-                                               {"action": "status", "workspace": "/p"})
-                self.assertEqual(empty.structured_content["revision"], 0)
+                empty = await claude.call_tool("brain_work_status",
+                                               {"workspace": "/p", "task": "main"})
+                self.assertEqual(empty.structured_content,
+                                 {"status": "UNKNOWN", "revision": 0, "work": None})
+                listed = await claude.call_tool("brain_work_status", {"workspace": "/p"})
+                self.assertEqual(listed.structured_content,
+                                 {"status": "KNOWN", "tasks": [], "limit": 30})
+                for action in ("list", "status"):
+                    rejected = await claude.call_tool("brain_work",
+                                                     {"action": action, "workspace": "/p"})
+                    self.assertTrue(rejected.is_error)
+                invalid = await claude.call_tool("brain_work_status", {"workspace": "p"})
+                self.assertEqual(invalid.structured_content["status"], "INVALID")
                 await claude.call_tool("brain_work", {"action": "claim", "workspace": "/p",
                     "agent": "claude:s1", "expected_revision": 0, "objective": "Implement sign in"})
                 await claude.call_tool("brain_work", {"action": "pause", "workspace": "/p",
                     "agent": "claude:s1", "expected_revision": 1, "summary": "Code done",
                     "next_action": "Run test_login.py", "references": ["login.py"]})
             async with Client(build_server(database)) as codex:
-                status = await codex.call_tool("brain_work",
-                                              {"action": "status", "workspace": "/p"})
+                status = await codex.call_tool("brain_work_status",
+                                              {"workspace": "/p", "task": "main"})
                 self.assertEqual(status.structured_content["work"]["next_action"],
                                  "Run test_login.py")
                 claimed = await codex.call_tool("brain_work", {"action": "claim", "workspace": "/p",
@@ -316,8 +326,7 @@ class WorkToolTests(unittest.IsolatedAsyncioTestCase):
                     "agent": "codex:s2", "expected_revision": 3, "summary": "Implementation ready",
                     "references": ["login.py"], "checks": ["12 tests passed"]})
             async with Client(build_server(database)) as reviewer:
-                listed = await reviewer.call_tool("brain_work",
-                                                 {"action": "list", "workspace": "/p"})
+                listed = await reviewer.call_tool("brain_work_status", {"workspace": "/p"})
                 self.assertEqual(len(listed.structured_content["tasks"]), 2)
                 claimed = await reviewer.call_tool("brain_work", {
                     "action": "claim", "workspace": "/p", "task": "verify",

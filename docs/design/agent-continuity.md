@@ -32,13 +32,15 @@ still belong to the chosen provider. No new LLM call is needed to store or read 
 
 ## Implemented local protocol
 
-`brain_work` uses the same **local SQLite store** as the connected memory server. Task keys are
-`(absolute workspace, task id)`. Windows paths ignore case and slash style; POSIX paths keep case.
+`brain_work_status` and `brain_work` use the connected memory server's **local SQLite store**.
+Task keys are `(absolute workspace, task id)`. Windows paths ignore case and slash style;
+POSIX paths keep case.
 No implicit global project, relative paths or cross-project fallback are accepted.
 
-1. `list` / `status`: see tasks or one task's packet and revision. The indexed list is bounded to
-   30; unfinished work is ordered first, then most recently updated. Completed history cannot
-   push active tasks out of the list. First-prototype records are upgraded without losing packets.
+1. `brain_work_status(workspace, task=None)`: see the folder's tasks, or pass a task id to read
+   its packet and revision. The indexed list is bounded to 30; unfinished work is ordered first,
+   then most recently updated. Completed history cannot push active tasks out of the list.
+   First-prototype records are upgraded without losing packets.
 2. `assign`: create a READY task for an app (`codex`) or one session (`claude-code:session-id`).
    `depends_on` names existing tasks in this workspace. Assign implementation first, then its
    dependent test/review task. Independent tasks can run concurrently under different ids.
@@ -172,12 +174,10 @@ pause, even if an older action exists. Omitting these fields preserves the exist
 
 ## Next integration gates
 
-- **Approval prompts.** `brain_work` is one tool that also clears packets, so it is marked
-  destructive and Codex asks before every call, reads included, until the user allows it. The
-  smoke runs allowed it with a test-only override; that override ships nowhere. The worker
-  runner allows `brain_work` only for the runs the user enabled and granted. Before release:
-  decide whether list/status become a separate read-only tool (one more tool every model
-  reads) or the prompt stays.
+- **Approval prompts.** Board reads use `brain_work_status`, marked read-only, non-destructive,
+  idempotent and local, so looking at tasks or a packet needs no write approval. `brain_work`
+  accepts only writes and remains destructive because it can clear packets. The worker runner
+  allows both tools only for the runs the user enabled and granted.
 
 - Two real installed apps on one fresh fixture store: implement, pause, switch, continue without
   a repeated user explanation; then assign a separate test task and verify the exact diff.

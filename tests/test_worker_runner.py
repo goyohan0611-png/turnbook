@@ -103,6 +103,7 @@ class WorkerRunnerTests(unittest.TestCase):
         self.assertEqual(call["argv"][at:at + 4], ["-C", str(self.repo), "-s", "read-only"])
         self.assertIn(f"Your owner name: {running['owner']}", call["prompt"])
         self.assertIn("Task: verify", call["prompt"])
+        self.assertIn("First call brain_work_status", call["prompt"])
         self.runner.tick()                                   # the grant was used
         self.assertEqual(len(self.calls()), 1)
         status = worker_runner.cli("workers-status", None, self.state, self.db)
@@ -160,6 +161,9 @@ class WorkerRunnerTests(unittest.TestCase):
         argv = self.calls()[0]["argv"]
         # the whole server (a config without one would stop Codex), on this service's store
         settings = dict(a.split("=", 1) for a in argv if a.startswith("mcp_servers.turnbook."))
+        for tool in ("brain_work", "brain_work_status"):
+            self.assertEqual(settings[f"mcp_servers.turnbook.tools.{tool}.approval_mode"],
+                             '"approve"')
         self.assertEqual(json.loads(settings["mcp_servers.turnbook.command"]), sys.executable)
         self.assertIn('TURNBOOK_DB=' + json.dumps(str(self.db)),
                       settings["mcp_servers.turnbook.env"])

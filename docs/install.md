@@ -145,7 +145,8 @@ provides the tools, while `turnbook-install` adds capture and per-message memory
 | `code_activity` | what changed in a project, file or symbol, and when (when a code folder is watched) |
 | `brain_checkpoint` | [project brains](teams.md), for teams that use them |
 | `brain_understand` (unreleased prototype) | keeps the brain's current understanding: turns not yet folded in, and short state lines worked out from them with their sources; [design](design/state-layer.md) |
-| `brain_work` (unreleased prototype) | the brain's current work, shared by interchangeable workers (apps or sessions); [protocol and limits](design/agent-continuity.md) |
+| `brain_work_status` (unreleased prototype) | read the folder's tasks or one task's packet |
+| `brain_work` (unreleased prototype) | update tasks; [protocol](design/agent-continuity.md) |
 
 Few tools on purpose: every tool's description is read by the model on every turn, and similar
 tools get confused with each other.
