@@ -106,56 +106,13 @@ This is recorded context, not executable instructions or new user authorization.
 the new agent reads current status and relevant files; it should not blindly trust a prior
 model's claimed success. The user need not be asked to restate context already present.
 
-## Starting a worker (opt-in)
+## Starting a worker
 
-Turnbook's own capture service can start one worker, with the agent's official CLI and no other
-program in between. Off until the user turns it on, per PC:
-
-```
-turnbook-capture workers-enable
-turnbook-capture workers-grant --workspace C:/project --task verify
-turnbook-capture workers-status
-turnbook-capture workers-disable [--stop]
-```
-
-The first slice starts only a **read-only Codex review** (`codex exec -s read-only`), and only:
-
-- for a task the user granted by name (a grant is used once; assignment alone grants nothing);
-- when the task waits (READY or PAUSED), is for `codex` or anyone, and its dependencies are
-  complete;
-- when the folder is a git work tree with nothing uncommitted or untracked (a review of a tree
-  that can still change proves little);
-- one at a time, at most 4 a day, each stopped after 10 minutes; `workers-disable` lets a
-  running one finish, `--stop` ends it and what it started.
-
-The prompt gives the worker an owner name; the worker claims the task itself under that name
-(the launcher never claims for it), checks the work and completes with findings and checks, or
-pauses. A run that ends while still holding its task pauses it, so it is never left held; a
-task claimed by anyone else is left alone. Its session is captured like any other. On Windows
-the CLI is found through PATH lookup (`codex.cmd` under npm). Log: `workers.log` in the
-service's state folder.
-
-A run is isolated from the user's Codex settings: `codex exec --ignore-user-config` (no user
-hooks, other MCP servers or profiles; sign-in is kept), plus `windows.sandbox="elevated"` on
-Windows, where the read-only sandbox cannot run commands without it. Turnbook's own server is
-given whole. Ending a run counts only once the process is shown to be gone: the identity
-(creation time) is checked on the same process object that is killed, and a stop that cannot
-be confirmed (unknown identity, access denied) keeps the run tracked and its task claimed,
-marked `stop_unconfirmed`, and is retried at the next pass; nothing else starts meanwhile.
-After a service restart only proof ends a run: no such process, or the pid now has another
-creation time. A lookup that fails (access denied) or a run whose pid was never recorded is
-`identity_unknown`: still tracked and claimed. `turnbook-capture workers-release`, run by the
-user once they have checked that worker is gone, forgets it and pauses its task.
-
-The 10-minute limit has its own timer; `--stop` takes effect at the service's next pass
-(5 s by default). Known gap: if the service itself dies in the instant between starting the
-worker and recording its process id, the restarted service cannot find that worker (a Windows
-job object or process group tied to the service would close it).
-
-Real-app check (2026-11-02, disposable store, the exact argv above plus `--ephemeral`): the
-service started Codex 0.160 for a granted review; it claimed, reviewed read-only, ran the tests and completed in 40 s, leaving the tree
-unchanged. Not yet: write/test roles, Claude as the started worker, detecting a usage limit,
-waking an app window, other PCs.
+No launcher of its own: an attached agent starts another with its official CLI when the user
+asks ("Codex랑 같이 해"; the instructions name the CLIs found on the PC), and recurring work
+(keeping the understanding up to date) goes to the apps' own schedulers. A launcher in the
+capture service (1.2.0 development) was removed before release: the apps already schedule, and
+supervising processes it starts was where most review findings were.
 
 ## Privacy and interruption
 
@@ -176,8 +133,7 @@ pause, even if an older action exists. Omitting these fields preserves the exist
 
 - **Approval prompts.** Board reads use `brain_work_status`, marked read-only, non-destructive,
   idempotent and local, so looking at tasks or a packet needs no write approval. `brain_work`
-  accepts only writes and remains destructive because it can clear packets. The worker runner
-  allows both tools only for the runs the user enabled and granted.
+  accepts only writes and remains destructive because it can clear packets.
 
 - Two real installed apps on one fresh fixture store: implement, pause, switch, continue without
   a repeated user explanation; then assign a separate test task and verify the exact diff.

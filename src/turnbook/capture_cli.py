@@ -43,30 +43,7 @@ def main(argv=None):
     commands.add_parser("once")
     commands.add_parser("run")
     commands.add_parser("status")
-    # the one brain's hand, off by default (worker_runner.py)
-    commands.add_parser("workers-enable")
-    disable = commands.add_parser("workers-disable")
-    disable.add_argument("--stop", action="store_true", help="also stop a running worker")
-    commands.add_parser("workers-status")
-    commands.add_parser("workers-release", help="after checking a worker the service cannot "
-                        "identify has ended: forget it and pause its task")
-    grant = commands.add_parser("workers-grant")
-    grant.add_argument("--workspace")
-    grant.add_argument("--task")
-    grant.add_argument("--understand", action="store_true",
-                       help="keep the brain's understanding of --scope up to date (standing)")
-    grant.add_argument("--scope", default="global")
     args = parser.parse_args(argv)
-    if args.command == "workers-grant" and not args.understand and not (
-            args.workspace and args.task):
-        parser.error("workers-grant needs --workspace and --task, or --understand")
-    if args.command.startswith("workers-"):
-        from turnbook.mcp_server import configured_db_path
-        from turnbook.worker_runner import cli
-        db = (load_config(args.config)["db_path"] if os.path.isfile(args.config)
-              else str(configured_db_path()))
-        _emit(cli(args.command, args, args.state_dir, db))
-        return 0
     if args.command == "configure":
         config = make_config(workspace=args.workspace, project_id=args.project,
             session_id=args.session, sessions_root=args.sessions_root,

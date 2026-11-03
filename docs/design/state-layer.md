@@ -70,7 +70,7 @@ Incremental, in date order: for each session not yet consolidated, the worker ge
 current state lines that share its subjects (not the whole state) and the session's turns, and
 returns state-line edits (add / replace value / add event or item), each with sources. It never
 sees a user question. In production any attached worker can do it, as a `brain_work` task: in its own
-session, or started by the worker runner (opt-in, daily cap).
+session, or run on a schedule by the app (a daily Claude Code or Codex task).
 
 ### Reading
 
@@ -141,7 +141,8 @@ too long to put 30 in a 1,200-character hook packet. So: compact lines, and few 
   note rule that drops cited turns does not apply to it), and only value lines show earlier
   values.
 
-Not yet: the runner role `understand`, ranking state against turns per question kind, stable
+Kept up to date by asking an agent or by an app's scheduled task (no launcher of Turnbook's own).
+Not yet: ranking state against turns per question kind, stable
 attribute names across batches beyond showing existing lines, a measured accuracy effect.
 
 ### First real runs (2026-11-03)

@@ -77,10 +77,7 @@ READ_STATE = ("state_lines are facts already worked out from the same conversati
 
 
 def load(path, key="question_id"):
-    if not Path(path).exists():
-        return {}
-    return {row[key]: row for row in map(json.loads, Path(path).read_text(
-        encoding="utf-8").splitlines()) if row}
+    return {row[key]: row for row in load_all(path)}
 
 
 def append(path, row):
@@ -277,7 +274,8 @@ def answer(args):
 def load_all(path):
     if not Path(path).exists():
         return []
-    return [json.loads(x) for x in Path(path).read_text(encoding="utf-8").splitlines() if x]
+    text = Path(path).read_text(encoding="utf-8")      # not splitlines: U+2028 in a text
+    return [json.loads(x) for x in text.split(chr(10)) if x.strip()]
 
 
 def judge(args):

@@ -9,9 +9,12 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
   not yet folded in and saves short state lines it works out from them ("old sneakers storage:
   shoe rack (plan)"), each citing its turns. A changed value updates its line; plans and unknown
   dates are marked as such. Lines are kept apart from facts you saved, masked before saving and
-  shared with your other PCs. `workers-grant --understand` lets the capture service have Codex
-  keep it up to date (off by default, at most every 6 hours). On a 527-turn history: 108 lines
-  in 141 s; 0.1-0.2 s added per message.
+  shared with your other PCs. Ask any agent ("이해 정리해 줘"), or schedule it in the app (a
+  daily Claude Code or Codex task). On a 527-turn history: 108 lines in 141 s; 0.1-0.2 s added
+  per message.
+- **Your rules, for every agent.** Tell any agent a standing rule ("항상 한국어로 답해"): it is
+  saved in the brain, and Claude, Codex, Gemini and OpenCode all start their next session with
+  it. A changed rule replaces the old one.
 - **Forgetting a turn also forgets what was built from it** (memories citing it in
   `from_turns`).
 - **Reading the work board asks for no approval.** `brain_work_status` reads; `brain_work`
@@ -25,9 +28,6 @@ Memory is kept across upgrades (checked in CI on Windows, Linux and macOS).
   now looks at the folder's work board first. Completing drops a stale next action. Checked with
   the real Claude Code and Codex CLIs on a throwaway store: Claude paused half-way, Codex
   finished from "이어서 해줘" alone, a new Claude session verified from "맡은 작업 있으면 해줘".
-- **Turnbook can start a review (off by default).** `turnbook-capture workers-enable`, then
-  `workers-grant` per task: the capture service starts a read-only Codex review of that task
-  (clean git tree, one at a time, 4 a day, 10 minutes each). No other program in between.
 - **turnbook-view** shows the brain's work in progress at the top of Sessions & work.
 - **`<private>` written as code** (`` `<private>` ``) is a mention, not a tag: an unclosed one
   dropped the rest of a message that only talked about the feature.
