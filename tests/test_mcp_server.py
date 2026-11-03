@@ -100,5 +100,19 @@ class GraphMindMcpServerTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("vectors_warmed", indexed.structured_content)
 
 
+class OtherAgentsTests(unittest.TestCase):
+    def test_names_only_the_installed_agent_clis(self):
+        from unittest import mock
+
+        from turnbook import mcp_server
+        with mock.patch("shutil.which", lambda name: name if name == "codex" else None):
+            line = mcp_server.other_agents()
+            self.assertIn('codex exec "<task>"', line)
+            self.assertNotIn("gemini", line)
+            self.assertIn(line, mcp_server.instructions(True))
+        with mock.patch("shutil.which", lambda name: None):
+            self.assertEqual(mcp_server.other_agents(), "")
+
+
 if __name__ == "__main__":
     unittest.main()

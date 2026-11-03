@@ -731,10 +731,31 @@ GUIDE = (
     "the recorded files and checks before relying on them.")
 
 
+# The agent CLIs a worker can start for one task, as the user's own command: no orchestration app
+AGENT_COMMANDS = {"codex": 'codex exec "<task>"', "claude": 'claude -p "<task>"',
+                  "gemini": 'gemini -p "<task>"', "opencode": 'opencode run "<task>"',
+                  "copilot": 'copilot -p "<task>"'}
+
+
+def other_agents() -> str:
+    """One line naming the agent CLIs on this PC, so 'work with Codex' needs no explanation."""
+    import shutil
+    found = [command for name, command in AGENT_COMMANDS.items() if shutil.which(name)]
+    if not found:
+        return ""
+    # ponytail: on PATH is not "Turnbook connected" and a headless run cannot answer approval
+    # prompts, so the caller carries the board: the prompt holds the task, the caller records it
+    return (" Agent CLIs on this PC: " + "; ".join(found) + ". Only when the user asks you to "
+            "work with one ('Codex랑 같이 해'), start it in the folder for one task: put the "
+            "objective, files and checks in the prompt (it may not have this memory), keep its "
+            "default permissions unless the user allows more, then record its result on the "
+            "board yourself (brain_work). A new run each time; no session to resume.")
+
+
 def instructions(captured: bool) -> str:
     """What every model is told about the memory: also written to a file for apps that do not
     pass a server's instructions on to the model (OpenCode's instructions file)."""
-    return (CAPTURED_NOTE if captured else PROACTIVE_NOTE) + GUIDE
+    return (CAPTURED_NOTE if captured else PROACTIVE_NOTE) + GUIDE + other_agents()
 
 
 def type_name(error) -> str:
