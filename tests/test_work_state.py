@@ -89,6 +89,19 @@ class WorkStateTests(unittest.TestCase):
                                        expected_revision=4, checks=["unittest: 2 passed"])
                 self.assertEqual(restated["work"]["checks"], ["unittest: 2 passed"])
 
+    def test_continue_in_another_folder_finds_the_unfinished_task(self):
+        """Codex opened in the home folder, told 'continue': the task lives in C:/project."""
+        with tempfile.TemporaryDirectory() as folder:
+            with WorkState(Path(folder) / "brain.sqlite") as work:
+                work.change("claim", "C:/project", agent="claude-code:s1",
+                            expected_revision=0, objective="Fix sign in")
+                work.change("claim", "C:/done", agent="codex:a", expected_revision=0,
+                            objective="old")
+                work.change("complete", "C:/done", agent="codex:a", expected_revision=1)
+                found = work.open_elsewhere("C:/Users/me")
+                self.assertEqual([t["objective"] for t in found], ["Fix sign in"])
+                self.assertEqual(work.open_elsewhere("C:/project"), [])
+
     def test_quiet_reads_the_owners_transcript_and_turns(self):
         import os
         from datetime import datetime, timedelta, timezone

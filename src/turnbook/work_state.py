@@ -107,6 +107,13 @@ class WorkState:
                                (workspace_key(workspace), max(1, min(limit, 100))))
         return [json.loads(row[0]) for row in rows]
 
+    def open_elsewhere(self, workspace, limit=5):
+        """Unfinished tasks of other folders, newest first: 'continue' asked in another folder."""
+        rows = self.db.execute("SELECT packet FROM work_items WHERE is_open=1 AND workspace<>? "
+                               "ORDER BY updated_at DESC LIMIT ?",
+                               (workspace_key(workspace), limit))
+        return [json.loads(row[0]) for row in rows]
+
     TAKEOVER_QUIET = timedelta(minutes=5)
     # apps whose own transcript gets a line on every tool call: its file's age shows whether the
     # session still works. Gemini CLI's and OpenCode's files are written by Turnbook's hooks for
